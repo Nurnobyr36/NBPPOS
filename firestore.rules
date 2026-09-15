@@ -1,0 +1,60 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128;
+    }
+
+    // Connection test document
+    match /test/{docId} {
+      allow read, write: if true;
+    }
+
+    // Products collection
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if isValidId(productId);
+    }
+
+    // Sales invoices collection
+    match /sales/{saleId} {
+      allow read: if true;
+      allow write: if isValidId(saleId);
+    }
+
+    // Purchases collection
+    match /purchases/{purchaseId} {
+      allow read: if true;
+      allow write: if isValidId(purchaseId);
+    }
+
+    // Customers collection
+    match /customers/{customerId} {
+      allow read: if true;
+      allow write: if isValidId(customerId);
+    }
+
+    // Suppliers collection
+    match /suppliers/{supplierId} {
+      allow read: if true;
+      allow write: if isValidId(supplierId);
+    }
+
+    // Stock Movements audit collection
+    match /stockMovements/{movementId} {
+      allow read: if true;
+      allow write: if isValidId(movementId);
+    }
+
+    // Shop Settings
+    match /shopSettings/{settingsId} {
+      allow read: if true;
+      allow write: if isValidId(settingsId);
+    }
+  }
+}

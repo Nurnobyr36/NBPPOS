@@ -1,0 +1,139 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "Inventory product item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "sku": { "type": "string" },
+        "barcode": { "type": "string" },
+        "categoryName": { "type": "string" },
+        "unitName": { "type": "string" },
+        "purchasePrice": { "type": "number" },
+        "salePrice": { "type": "number" },
+        "currentStock": { "type": "number" },
+        "minStock": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "inactive"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "name", "salePrice", "currentStock"]
+    },
+    "Sale": {
+      "title": "Sale",
+      "description": "POS checkout transaction",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "invoiceNo": { "type": "string" },
+        "total": { "type": "number" },
+        "paidAmount": { "type": "number" },
+        "dueAmount": { "type": "number" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "invoiceNo", "total"]
+    },
+    "Purchase": {
+      "title": "Purchase",
+      "description": "Supplier purchase record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "purchaseNo": { "type": "string" },
+        "supplierId": { "type": "string" },
+        "supplierName": { "type": "string" },
+        "total": { "type": "number" },
+        "paidAmount": { "type": "number" },
+        "dueAmount": { "type": "number" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "purchaseNo", "total"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Customer details and balance",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "totalDue": { "type": "number" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    },
+    "Supplier": {
+      "title": "Supplier",
+      "description": "Vendor details and balance",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "totalPayable": { "type": "number" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    },
+    "StockMovement": {
+      "title": "StockMovement",
+      "description": "Stock adjustment and ledger tracking",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "productId": { "type": "string" },
+        "productName": { "type": "string" },
+        "type": { "type": "string" },
+        "qtyChange": { "type": "number" },
+        "resultingStock": { "type": "number" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "productId", "type", "qtyChange"]
+    },
+    "ShopSettings": {
+      "title": "ShopSettings",
+      "description": "Shop settings and currency",
+      "type": "object",
+      "properties": {
+        "shopName": { "type": "string" },
+        "phone": { "type": "string" },
+        "currencySymbol": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["shopName"]
+    }
+  },
+  "firestore": {
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Inventory product items"
+    },
+    "/sales/{saleId}": {
+      "schema": "Sale",
+      "description": "Sales invoice records"
+    },
+    "/purchases/{purchaseId}": {
+      "schema": "Purchase",
+      "description": "Supplier purchase invoices"
+    },
+    "/customers/{customerId}": {
+      "schema": "Customer",
+      "description": "Customer directory"
+    },
+    "/suppliers/{supplierId}": {
+      "schema": "Supplier",
+      "description": "Supplier directory"
+    },
+    "/stockMovements/{movementId}": {
+      "schema": "StockMovement",
+      "description": "Stock movement audit trail"
+    },
+    "/shopSettings/{settingsId}": {
+      "schema": "ShopSettings",
+      "description": "Shop preferences"
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "SmartShop POS - স্মার্টশপ পিওএস",
+  "description": "একটি আধুনিক ও পূর্ণাঙ্গ পিওএস, ইনভেন্টরি, বাকি খাতা ও ImgBB ছবি আপলোড ম্যানেজমেন্ট সিস্টেম",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
