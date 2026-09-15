@@ -12,9 +12,13 @@ import {
   X,
   AlertTriangle,
   Store,
+  ShieldCheck,
+  User,
+  Crown,
 } from 'lucide-react';
 import { Language } from '../types';
 import { translations } from '../utils/formatters';
+import { useAuth } from '../context/AuthContext';
 
 interface SidebarProps {
   currentTab: string;
@@ -25,6 +29,7 @@ interface SidebarProps {
   lowStockCount?: number;
   shopName?: string;
   logoUrl?: string;
+  onOpenAuthModal?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -36,8 +41,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   lowStockCount = 0,
   shopName = 'SmartShop POS',
   logoUrl,
+  onOpenAuthModal,
 }) => {
   const t = translations[lang];
+  const { sellerName, currentUser, userProfile } = useAuth();
 
   const menuItems = [
     { id: 'dashboard', label: t.dashboard, icon: LayoutDashboard },
@@ -177,13 +184,62 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </nav>
 
         {/* Footer Info */}
-        <div className="p-3 border-t border-emerald-900/60 bg-emerald-950/90 text-xs">
+        <div className="p-3 border-t border-emerald-900/60 bg-emerald-950/90 text-xs space-y-2">
+          {/* Active Seller Profile Switcher */}
+          <button
+            type="button"
+            id="sidebar-seller-profile-btn"
+            onClick={() => {
+              if (onOpenAuthModal) {
+                onOpenAuthModal();
+                onCloseMobile();
+              }
+            }}
+            className="w-full p-2 rounded-xl bg-emerald-900/60 hover:bg-emerald-900 border border-emerald-800/80 text-left flex items-center justify-between gap-2 transition-colors cursor-pointer group"
+            title="ক্যাশিয়ার/বিক্রেতা প্রোফাইল বা লগইন"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              {currentUser?.photoURL ? (
+                <img
+                  src={currentUser.photoURL}
+                  alt={sellerName}
+                  referrerPolicy="no-referrer"
+                  className="w-7 h-7 rounded-lg object-cover ring-1 ring-emerald-500/50"
+                />
+              ) : (
+                <div className="w-7 h-7 rounded-lg bg-emerald-700 group-hover:bg-emerald-600 text-white font-black text-xs flex items-center justify-center shrink-0 shadow-xs">
+                  {sellerName.charAt(0)}
+                </div>
+              )}
+              <div className="min-w-0">
+                <div className="text-[10px] text-emerald-300/80 font-medium flex items-center gap-1">
+                  {userProfile?.role === 'super_admin' ? (
+                    <span className="text-amber-400 font-bold flex items-center gap-0.5">
+                      <Crown className="w-3 h-3 text-amber-400" />
+                      সুপার এডমিন
+                    </span>
+                  ) : userProfile?.role === 'admin' ? (
+                    'এডমিন'
+                  ) : (
+                    'ক্যাশিয়ার'
+                  )}
+                </div>
+                <div className="text-xs font-bold text-white truncate max-w-[110px]">
+                  {sellerName}
+                </div>
+              </div>
+            </div>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-800/80 text-emerald-200 group-hover:bg-emerald-700 shrink-0">
+              বদল
+            </span>
+          </button>
+
           {lowStockCount > 0 && (
             <button
               type="button"
               id="sidebar-low-stock-alert"
               onClick={() => handleNav('stock')}
-              className="w-full mb-2 p-2 rounded-lg bg-rose-950/80 border border-rose-800/80 text-rose-200 flex items-center gap-2 cursor-pointer hover:bg-rose-900/80 transition-colors text-left"
+              className="w-full mb-1 p-2 rounded-lg bg-rose-950/80 border border-rose-800/80 text-rose-200 flex items-center gap-2 cursor-pointer hover:bg-rose-900/80 transition-colors text-left"
             >
               <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
               <span className="text-[11px] leading-tight">

@@ -81,7 +81,21 @@ export interface Sale {
   notes?: string;
   status: 'posted' | 'returned';
   cashierName: string;
+  sellerId?: string;
+  sellerName?: string;
+  sellerEmail?: string;
   createdAt: string;
+}
+
+export interface UserProfile {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL?: string | null;
+  role?: 'super_admin' | 'admin' | 'cashier' | 'seller';
+  phoneNumber?: string | null;
+  createdAt?: string;
+  createdBy?: string;
 }
 
 export interface PurchaseItem {

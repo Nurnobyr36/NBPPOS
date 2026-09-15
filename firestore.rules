@@ -56,5 +56,11 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isValidId(settingsId);
     }
+
+    // Cashier and Seller User Profiles
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if isValidId(userId);
+    }
   }
 }

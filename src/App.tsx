@@ -47,12 +47,16 @@ import { SuppliersView } from './views/SuppliersView';
 import { SalesView } from './views/SalesView';
 import { InvoiceView } from './views/InvoiceView';
 import { SettingsView } from './views/SettingsView';
+import { AuthModal } from './components/AuthModal';
+import { useAuth } from './context/AuthContext';
 
 export function App() {
+  const { isPOSAuthorized, loading: authLoading } = useAuth();
   // Navigation tab state
   const [activeTab, setActiveTab] = useState<TabType>('pos');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   // App settings & theme
   const [darkMode, setDarkMode] = useState<boolean>(() => {
@@ -245,6 +249,9 @@ export function App() {
   const handleGoToPos = () => {
     setActiveTab('pos');
     setMobileMenuOpen(false);
+    if (!isPOSAuthorized && !authLoading) {
+      setIsAuthModalOpen(true);
+    }
   };
 
   const handleAddNewProduct = () => {
@@ -289,6 +296,7 @@ export function App() {
         lowStockCount={lowStockCount}
         shopName={shopSettings.shopName}
         logoUrl={shopSettings.logoUrl}
+        onOpenAuthModal={() => setIsAuthModalOpen(true)}
       />
 
       {/* Main Wrapper */}
@@ -309,6 +317,7 @@ export function App() {
           products={products}
           sales={sales}
           cloudStatus={cloudStatus}
+          onOpenAuthModal={() => setIsAuthModalOpen(true)}
           onSelectProduct={(product) => {
             setEditingProduct(product);
             setActiveTab('product-edit');
@@ -347,6 +356,7 @@ export function App() {
               onCheckoutComplete={handleCheckoutComplete}
               onRefreshData={loadData}
               onOpenProductForm={handleAddNewProduct}
+              onOpenAuthModal={() => setIsAuthModalOpen(true)}
             />
           )}
 
@@ -466,6 +476,13 @@ export function App() {
           )}
         </main>
       </div>
+
+      {/* Auth & Seller Management Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        lang={lang}
+      />
     </div>
   );
 }

@@ -32,9 +32,27 @@
         "paidAmount": { "type": "number" },
         "dueAmount": { "type": "number" },
         "status": { "type": "string" },
+        "cashierName": { "type": "string" },
+        "sellerId": { "type": "string" },
+        "sellerName": { "type": "string" },
+        "sellerEmail": { "type": "string" },
         "createdAt": { "type": "string" }
       },
       "required": ["id", "invoiceNo", "total"]
+    },
+    "User": {
+      "title": "User",
+      "description": "Authenticated cashier or sales staff profile",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["uid", "displayName"]
     },
     "Purchase": {
       "title": "Purchase",
@@ -134,6 +152,10 @@
     "/shopSettings/{settingsId}": {
       "schema": "ShopSettings",
       "description": "Shop preferences"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles and sellers"
     }
   }
 }

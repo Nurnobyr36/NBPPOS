@@ -137,6 +137,7 @@ export const InvoiceView: React.FC<InvoiceViewProps> = ({
 🏪 প্রতিষ্ঠান: ${shopSettings.shopName}
 📞 মোবাইল: ${shopSettings.phone || '-'}
 👤 কাস্টমার: ${sale.customerName}
+🧑‍💼 বিক্রেতা: ${sale.sellerName || sale.cashierName || 'এডমিন'}
 📅 তারিখ: ${formatDate(sale.createdAt, true)}
 --------------------------------
 🛒 আইটেম সংখ্যা: ${(sale.items || []).length} টি
@@ -159,6 +160,7 @@ ${shopSettings.invoiceFooter || 'ধন্যবাদ, আবার আসব�
 *ইনভয়েস:* #${sale.invoiceNo}
 *তারিখ:* ${formatDate(sale.createdAt, true)}
 *কাস্টমার:* ${sale.customerName}
+*বিক্রেতা:* ${sale.sellerName || sale.cashierName || 'এডমিন'}
 
 *ক্রয়কৃত পণ্যের বিবরণ:*
 ${(sale.items || []).map((it) => `• ${it.name} (${it.qty} টি) = ${formatMoney(it.lineTotal, currencySymbol)}`).join('\n')}
@@ -620,11 +622,16 @@ _${shopSettings.invoiceFooter || 'আমাদের সাথে থাকা�
                 </div>
                 <div className="text-right">
                   <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
-                    ক্যাশিয়ার / কাউন্টার
+                    বিক্রেতা / ক্যাশিয়ার
                   </span>
                   <div className="font-bold text-slate-800 dark:text-slate-200 mt-0.5 truncate">
-                    {sale.cashierName || 'এডমিন'}
+                    {sale.sellerName || sale.cashierName || 'এডমিন'}
                   </div>
+                  {sale.sellerEmail && (
+                    <div className="text-[10px] text-slate-500 font-mono truncate">
+                      {sale.sellerEmail}
+                    </div>
+                  )}
                   <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">
                     টার্মিনাল #০১
                   </div>
@@ -842,11 +849,10 @@ _${shopSettings.invoiceFooter || 'আমাদের সাথে থাকা�
                   <span className="font-mono text-slate-600">{sale.customerPhone}</span>
                 )}
               </div>
-              {sale.cashierName && (
-                <div className="text-[11px] text-slate-500 font-sans">
-                  ক্যাশিয়ার: {sale.cashierName}
-                </div>
-              )}
+              <div className="text-[11px] text-slate-700 font-sans flex justify-between">
+                <span>বিক্রেতা: <strong>{sale.sellerName || sale.cashierName || 'এডমিন'}</strong></span>
+                {sale.sellerEmail && <span className="text-[10px] text-slate-500">{sale.sellerEmail}</span>}
+              </div>
             </div>
 
             {/* Table */}
@@ -974,6 +980,7 @@ _${shopSettings.invoiceFooter || 'আমাদের সাথে থাকা�
               <div>ইনভয়েস: #{sale.invoiceNo}</div>
               <div>তারিখ: {formatDate(sale.createdAt, false)}</div>
               <div>কাস্টমার: {sale.customerName}</div>
+              <div>বিক্রেতা: <strong>{sale.sellerName || sale.cashierName || 'এডমিন'}</strong></div>
             </div>
 
             <div className="py-2 divide-y divide-slate-200">
@@ -1061,8 +1068,13 @@ _${shopSettings.invoiceFooter || 'আমাদের সাথে থাকা�
                   তারিখ: <strong>{formatDate(sale.createdAt, true)}</strong>
                 </div>
                 <div className="text-xs text-slate-600">
-                  অপারেটর: <strong>{sale.cashierName || 'এডমিন'}</strong>
+                  বিক্রেতা / অপারেটর: <strong>{sale.sellerName || sale.cashierName || 'এডমিন'}</strong>
                 </div>
+                {sale.sellerEmail && (
+                  <div className="text-[10px] text-slate-500 font-mono">
+                    {sale.sellerEmail}
+                  </div>
+                )}
               </div>
             </div>
 
