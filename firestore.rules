@@ -62,5 +62,11 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isValidId(userId);
     }
+
+    // Staff Accounts (created by super admins)
+    match /staff_accounts/{staffId} {
+      allow read: if true;
+      allow write: if isValidId(staffId);
+    }
   }
 }

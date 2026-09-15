@@ -87,12 +87,41 @@ export interface Sale {
   createdAt: string;
 }
 
+// Designated Admin Emails specified by the shop owner
+export const DESIGNATED_ADMIN_EMAILS: string[] = [
+  'nurnobyr36@gmail.com',
+  'sabihait20@gmail.com',
+  'admin@nihadbp.top',
+  'musicnrs2020@gmail.com',
+];
+
+export const isDesignatedAdminEmail = (email?: string | null): boolean => {
+  if (!email) return false;
+  const clean = email.trim().toLowerCase();
+  return DESIGNATED_ADMIN_EMAILS.includes(clean);
+};
+
+export interface StaffAccount {
+  id: string; // Document ID
+  staffCode: string; // e.g. STF-101 or cashier username
+  name: string;
+  pin: string; // 4-6 digit numeric pin or password
+  role: 'cashier' | 'seller';
+  phone?: string;
+  status: 'active' | 'suspended';
+  createdByEmail: string;
+  createdAt: string;
+  lastLoginAt?: string;
+}
+
 export interface UserProfile {
   uid: string;
   email: string | null;
   displayName: string | null;
   photoURL?: string | null;
   role?: 'super_admin' | 'admin' | 'cashier' | 'seller';
+  staffCode?: string;
+  isDesignatedAdmin?: boolean;
   phoneNumber?: string | null;
   createdAt?: string;
   createdBy?: string;

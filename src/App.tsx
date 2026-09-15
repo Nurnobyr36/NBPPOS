@@ -48,6 +48,7 @@ import { SalesView } from './views/SalesView';
 import { InvoiceView } from './views/InvoiceView';
 import { SettingsView } from './views/SettingsView';
 import { AuthModal } from './components/AuthModal';
+import { StaffManagementModal } from './components/StaffManagementModal';
 import { useAuth } from './context/AuthContext';
 
 export function App() {
@@ -57,6 +58,7 @@ export function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
 
   // App settings & theme
   const [darkMode, setDarkMode] = useState<boolean>(() => {
@@ -297,6 +299,7 @@ export function App() {
         shopName={shopSettings.shopName}
         logoUrl={shopSettings.logoUrl}
         onOpenAuthModal={() => setIsAuthModalOpen(true)}
+        onOpenStaffManagement={() => setIsStaffModalOpen(true)}
       />
 
       {/* Main Wrapper */}
@@ -472,6 +475,7 @@ export function App() {
                 loadData();
               }}
               onResetDemo={loadData}
+              onOpenStaffManagement={() => setIsStaffModalOpen(true)}
             />
           )}
         </main>
@@ -482,6 +486,13 @@ export function App() {
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
         lang={lang}
+        onOpenStaffManagement={() => setIsStaffModalOpen(true)}
+      />
+
+      {/* Staff Management Modal for Designated Admins */}
+      <StaffManagementModal
+        isOpen={isStaffModalOpen}
+        onClose={() => setIsStaffModalOpen(false)}
       />
     </div>
   );

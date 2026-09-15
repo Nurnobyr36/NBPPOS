@@ -17,6 +17,7 @@ import {
 import { Product, StockMovement, Language } from '../types';
 import { formatDate, formatMoney, translations } from '../utils/formatters';
 import { adjustProductStock } from '../services/storage';
+import { useAuth } from '../context/AuthContext';
 
 interface StockViewProps {
   products?: Product[];
@@ -38,6 +39,7 @@ export const StockView: React.FC<StockViewProps> = ({
   onCloseModal,
 }) => {
   const t = translations[lang];
+  const { canViewBuyPrice } = useAuth();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [adjustModalProduct, setAdjustModalProduct] = useState<Product | null>(
@@ -136,7 +138,7 @@ export const StockView: React.FC<StockViewProps> = ({
       </div>
 
       {/* Admin Valuation KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+      <div className={`grid grid-cols-1 ${canViewBuyPrice ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-2'} gap-3.5`}>
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4 border-l-blue-600 rounded-xl p-4 shadow-2xs">
           <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-1.5">
             <span className="text-xs font-semibold">মোট ইনভেন্টরি পণ্য</span>
@@ -152,20 +154,22 @@ export const StockView: React.FC<StockViewProps> = ({
           </p>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4 border-l-amber-600 rounded-xl p-4 shadow-2xs">
-          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-1.5">
-            <span className="text-xs font-semibold">মোট কেনা দাম (বিনিয়োগ)</span>
-            <div className="p-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400">
-              <Wallet className="w-4 h-4" />
+        {canViewBuyPrice && (
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4 border-l-amber-600 rounded-xl p-4 shadow-2xs">
+            <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-1.5">
+              <span className="text-xs font-semibold">মোট কেনা দাম (বিনিয়োগ)</span>
+              <div className="p-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400">
+                <Wallet className="w-4 h-4" />
+              </div>
             </div>
+            <div className="text-lg sm:text-xl font-black text-amber-700 dark:text-amber-400 tabular-nums">
+              {formatMoney(totalStockPurchaseValue, currencySymbol)}
+            </div>
+            <p className="text-[11px] text-amber-600/80 dark:text-amber-400/80 mt-1 font-medium">
+              মজুদ মালের ক্রয় মূল্যের মোট হিসাব
+            </p>
           </div>
-          <div className="text-lg sm:text-xl font-black text-amber-700 dark:text-amber-400 tabular-nums">
-            {formatMoney(totalStockPurchaseValue, currencySymbol)}
-          </div>
-          <p className="text-[11px] text-amber-600/80 dark:text-amber-400/80 mt-1 font-medium">
-            মজুদ মালের ক্রয় মূল্যের মোট হিসাব
-          </p>
-        </div>
+        )}
 
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4 border-l-emerald-600 rounded-xl p-4 shadow-2xs">
           <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-1.5">
@@ -182,20 +186,22 @@ export const StockView: React.FC<StockViewProps> = ({
           </p>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4 border-l-purple-600 rounded-xl p-4 shadow-2xs">
-          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-1.5">
-            <span className="text-xs font-semibold">সম্ভাব্য মোট লাভ</span>
-            <div className="p-1.5 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400">
-              <Coins className="w-4 h-4" />
+        {canViewBuyPrice && (
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4 border-l-purple-600 rounded-xl p-4 shadow-2xs">
+            <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-1.5">
+              <span className="text-xs font-semibold">সম্ভাব্য মোট লাভ</span>
+              <div className="p-1.5 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400">
+                <Coins className="w-4 h-4" />
+              </div>
             </div>
+            <div className="text-lg sm:text-xl font-black text-purple-700 dark:text-purple-400 tabular-nums">
+              {formatMoney(totalPotentialProfit, currencySymbol)}
+            </div>
+            <p className="text-[11px] text-purple-600/80 dark:text-purple-400/80 mt-1 font-medium">
+              বিক্রয় মূল্য - কেনা দাম
+            </p>
           </div>
-          <div className="text-lg sm:text-xl font-black text-purple-700 dark:text-purple-400 tabular-nums">
-            {formatMoney(totalPotentialProfit, currencySymbol)}
-          </div>
-          <p className="text-[11px] text-purple-600/80 dark:text-purple-400/80 mt-1 font-medium">
-            বিক্রয় মূল্য - কেনা দাম
-          </p>
-        </div>
+        )}
       </div>
 
       {/* Product Stock Table */}
@@ -224,10 +230,16 @@ export const StockView: React.FC<StockViewProps> = ({
                 <th className="py-2.5 px-3 font-semibold">পণ্য</th>
                 <th className="py-2.5 px-3 font-semibold">SKU কোড</th>
                 <th className="py-2.5 px-3 font-semibold">বর্তমান মজুদ</th>
-                <th className="py-2.5 px-3 font-semibold">কেনা দাম (ক্রয় মূল্য)</th>
+                {canViewBuyPrice && (
+                  <th className="py-2.5 px-3 font-semibold text-amber-700 dark:text-amber-400">কেনা দাম (ক্রয় মূল্য)</th>
+                )}
                 <th className="py-2.5 px-3 font-semibold">বিক্রয় মূল্য</th>
-                <th className="py-2.5 px-3 font-semibold">একক লাভ</th>
-                <th className="py-2.5 px-3 font-semibold">মোট কেনা ভ্যালু</th>
+                {canViewBuyPrice && (
+                  <th className="py-2.5 px-3 font-semibold">একক লাভ</th>
+                )}
+                {canViewBuyPrice && (
+                  <th className="py-2.5 px-3 font-semibold">মোট কেনা ভ্যালু</th>
+                )}
                 <th className="py-2.5 px-3 font-semibold">স্ট্যাটাস</th>
                 <th className="py-2.5 px-3 font-semibold text-right">অ্যাকশন</th>
               </tr>
@@ -235,7 +247,7 @@ export const StockView: React.FC<StockViewProps> = ({
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-8 text-center text-slate-400">
+                  <td colSpan={canViewBuyPrice ? 9 : 6} className="py-8 text-center text-slate-400">
                     কোনো পণ্য পাওয়া যায়নি
                   </td>
                 </tr>
@@ -265,20 +277,26 @@ export const StockView: React.FC<StockViewProps> = ({
                       <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-slate-100 tabular-nums">
                         {p.currentStock || 0} {p.unitName}
                       </td>
-                      <td className="py-2.5 px-3 font-semibold text-amber-700 dark:text-amber-400 tabular-nums">
-                        {formatMoney(pCost, currencySymbol)}
-                      </td>
+                      {canViewBuyPrice && (
+                        <td className="py-2.5 px-3 font-semibold text-amber-700 dark:text-amber-400 tabular-nums">
+                          {formatMoney(pCost, currencySymbol)}
+                        </td>
+                      )}
                       <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-slate-100 tabular-nums">
                         {formatMoney(pSale, currencySymbol)}
                       </td>
-                      <td className="py-2.5 px-3 font-semibold tabular-nums">
-                        <span className={unitProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600'}>
-                          +{formatMoney(unitProfit, currencySymbol)}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-3 font-semibold text-slate-700 dark:text-slate-300 tabular-nums">
-                        {formatMoney(totalCostValue, currencySymbol)}
-                      </td>
+                      {canViewBuyPrice && (
+                        <td className="py-2.5 px-3 font-semibold tabular-nums">
+                          <span className={unitProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600'}>
+                            +{formatMoney(unitProfit, currencySymbol)}
+                          </span>
+                        </td>
+                      )}
+                      {canViewBuyPrice && (
+                        <td className="py-2.5 px-3 font-semibold text-slate-700 dark:text-slate-300 tabular-nums">
+                          {formatMoney(totalCostValue, currencySymbol)}
+                        </td>
+                      )}
                       <td className="py-2.5 px-3">
                         {isOut ? (
                           <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300">

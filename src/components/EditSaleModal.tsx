@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Sale, SaleItem, Customer, Product } from '../types';
 import { formatMoney } from '../utils/formatters';
+import { useAuth } from '../context/AuthContext';
 
 interface EditSaleModalProps {
   sale: Sale;
@@ -33,6 +34,7 @@ export const EditSaleModal: React.FC<EditSaleModalProps> = ({
   onClose,
   onSave,
 }) => {
+  const { canViewBuyPrice } = useAuth();
   if (!isOpen) return null;
 
   // Form State initialized from current sale
@@ -374,7 +376,7 @@ export const EditSaleModal: React.FC<EditSaleModalProps> = ({
                     <tr key={it.productId || idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
                       <td className="py-2 px-3 font-semibold text-slate-800 dark:text-slate-200">
                         {it.name}
-                        {it.purchasePrice !== undefined && (
+                        {canViewBuyPrice && it.purchasePrice !== undefined && (
                           <span className="block text-[10px] text-amber-700 dark:text-amber-400 font-normal">
                             কেনা: {formatMoney(it.purchasePrice, currencySymbol)}
                           </span>
@@ -541,10 +543,12 @@ export const EditSaleModal: React.FC<EditSaleModalProps> = ({
                 </div>
               )}
 
-              <div className="flex justify-between text-[11px] font-semibold text-purple-700 dark:text-purple-400 pt-1 border-t border-slate-200 dark:border-slate-700">
-                <span>আনুমানিক নিট লাভ:</span>
-                <span className="tabular-nums">+{formatMoney(estimatedProfit, currencySymbol)}</span>
-              </div>
+              {canViewBuyPrice && (
+                <div className="flex justify-between text-[11px] font-semibold text-purple-700 dark:text-purple-400 pt-1 border-t border-slate-200 dark:border-slate-700">
+                  <span>আনুমানিক নিট লাভ:</span>
+                  <span className="tabular-nums">+{formatMoney(estimatedProfit, currencySymbol)}</span>
+                </div>
+              )}
             </div>
           </div>
 

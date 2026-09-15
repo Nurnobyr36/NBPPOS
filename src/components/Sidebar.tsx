@@ -30,6 +30,7 @@ interface SidebarProps {
   shopName?: string;
   logoUrl?: string;
   onOpenAuthModal?: () => void;
+  onOpenStaffManagement?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -42,9 +43,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   shopName = 'SmartShop POS',
   logoUrl,
   onOpenAuthModal,
+  onOpenStaffManagement,
 }) => {
   const t = translations[lang];
-  const { sellerName, currentUser, userProfile } = useAuth();
+  const { sellerName, currentUser, userProfile, canManageStaff, staffAccounts } = useAuth();
 
   const menuItems = [
     { id: 'dashboard', label: t.dashboard, icon: LayoutDashboard },
@@ -185,6 +187,34 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Footer Info */}
         <div className="p-3 border-t border-emerald-900/60 bg-emerald-950/90 text-xs space-y-2">
+          {/* Designated Admin: Staff Management Button */}
+          {canManageStaff && (
+            <button
+              type="button"
+              id="sidebar-staff-manage-btn"
+              onClick={() => {
+                if (onOpenStaffManagement) {
+                  onOpenStaffManagement();
+                  onCloseMobile();
+                }
+              }}
+              className="w-full p-2 rounded-xl bg-gradient-to-r from-amber-500/20 to-emerald-600/20 hover:from-amber-500/30 hover:to-emerald-600/30 border border-amber-400/40 text-amber-300 text-left flex items-center justify-between gap-2 transition-colors cursor-pointer group"
+              title="স্টাফ আইডি তৈরি ও পরিচালনা"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-6 h-6 rounded-lg bg-amber-500/30 text-amber-300 flex items-center justify-center shrink-0">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                </div>
+                <div className="min-w-0 text-xs font-bold truncate">
+                  স্টাফ আইডি পরিচালনা
+                </div>
+              </div>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 font-mono font-bold shrink-0">
+                {staffAccounts.length}
+              </span>
+            </button>
+          )}
+
           {/* Active Seller Profile Switcher */}
           <button
             type="button"

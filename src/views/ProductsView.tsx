@@ -17,6 +17,7 @@ import {
 import { Product, Language } from '../types';
 import { formatMoney, translations } from '../utils/formatters';
 import { deleteProduct } from '../services/storage';
+import { useAuth } from '../context/AuthContext';
 
 interface ProductsViewProps {
   products?: Product[];
@@ -38,6 +39,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
   onRefreshData,
 }) => {
   const t = translations[lang];
+  const { canViewBuyPrice } = useAuth();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -128,49 +130,83 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
         </button>
       </div>
 
-      {/* Admin Valuation Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 flex items-center gap-3 shadow-2xs">
-          <div className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 shrink-0">
-            <Wallet className="w-5 h-5" />
-          </div>
-          <div className="min-w-0">
-            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block">
-              মোট স্টক কেনা দাম (ক্রয় মূল্য)
-            </span>
-            <span className="text-base sm:text-lg font-black text-amber-700 dark:text-amber-400 tabular-nums">
-              {formatMoney(totalStockPurchaseCost, currencySymbol)}
-            </span>
-          </div>
-        </div>
+      {/* Valuation Summary Cards */}
+      <div className={`grid grid-cols-1 ${canViewBuyPrice ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-3`}>
+        {canViewBuyPrice ? (
+          <>
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 flex items-center gap-3 shadow-2xs">
+              <div className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 shrink-0">
+                <Wallet className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block">
+                  মোট স্টক কেনা দাম (ক্রয় মূল্য)
+                </span>
+                <span className="text-base sm:text-lg font-black text-amber-700 dark:text-amber-400 tabular-nums">
+                  {formatMoney(totalStockPurchaseCost, currencySymbol)}
+                </span>
+              </div>
+            </div>
 
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 flex items-center gap-3 shadow-2xs">
-          <div className="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 shrink-0">
-            <DollarSign className="w-5 h-5" />
-          </div>
-          <div className="min-w-0">
-            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block">
-              মোট স্টক বিক্রয় মূল্য
-            </span>
-            <span className="text-base sm:text-lg font-black text-emerald-700 dark:text-emerald-400 tabular-nums">
-              {formatMoney(totalStockSaleValue, currencySymbol)}
-            </span>
-          </div>
-        </div>
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 flex items-center gap-3 shadow-2xs">
+              <div className="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 shrink-0">
+                <DollarSign className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block">
+                  মোট স্টক বিক্রয় মূল্য
+                </span>
+                <span className="text-base sm:text-lg font-black text-emerald-700 dark:text-emerald-400 tabular-nums">
+                  {formatMoney(totalStockSaleValue, currencySymbol)}
+                </span>
+              </div>
+            </div>
 
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 flex items-center gap-3 shadow-2xs">
-          <div className="p-2.5 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400 shrink-0">
-            <TrendingUp className="w-5 h-5" />
-          </div>
-          <div className="min-w-0">
-            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block">
-              সম্ভাব্য মোট প্রফিট
-            </span>
-            <span className="text-base sm:text-lg font-black text-purple-700 dark:text-purple-400 tabular-nums">
-              +{formatMoney(totalStockSaleValue - totalStockPurchaseCost, currencySymbol)}
-            </span>
-          </div>
-        </div>
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 flex items-center gap-3 shadow-2xs">
+              <div className="p-2.5 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400 shrink-0">
+                <TrendingUp className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block">
+                  সম্ভাব্য মোট প্রফিট
+                </span>
+                <span className="text-base sm:text-lg font-black text-purple-700 dark:text-purple-400 tabular-nums">
+                  +{formatMoney(totalStockSaleValue - totalStockPurchaseCost, currencySymbol)}
+                </span>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 flex items-center gap-3 shadow-2xs">
+              <div className="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 shrink-0">
+                <Package className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block">
+                  মোট নিবন্ধিত পণ্য সংখ্যা
+                </span>
+                <span className="text-base sm:text-lg font-black text-emerald-700 dark:text-emerald-400 tabular-nums">
+                  {(products || []).length} টি
+                </span>
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 flex items-center gap-3 shadow-2xs">
+              <div className="p-2.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 shrink-0">
+                <DollarSign className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block">
+                  মোট স্টক বিক্রয় মূল্য
+                </span>
+                <span className="text-base sm:text-lg font-black text-blue-700 dark:text-blue-400 tabular-nums">
+                  {formatMoney(totalStockSaleValue, currencySymbol)}
+                </span>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Filter Bar */}
@@ -243,9 +279,13 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                 <th className="py-3 px-3.5 font-semibold">পণ্যের নাম ও ক্যাটাগরি</th>
                 <th className="py-3 px-3.5 font-semibold">SKU / বারকোড</th>
                 <th className="py-3 px-3.5 font-semibold">স্টক</th>
-                <th className="py-3 px-3.5 font-semibold text-amber-700 dark:text-amber-400">কেনা দাম (ক্রয়)</th>
+                {canViewBuyPrice && (
+                  <th className="py-3 px-3.5 font-semibold text-amber-700 dark:text-amber-400">কেনা দাম (ক্রয়)</th>
+                )}
                 <th className="py-3 px-3.5 font-semibold text-emerald-700 dark:text-emerald-400">বিক্রয় মূল্য</th>
-                <th className="py-3 px-3.5 font-semibold text-purple-700 dark:text-purple-400">লাভ (মার্জিন)</th>
+                {canViewBuyPrice && (
+                  <th className="py-3 px-3.5 font-semibold text-purple-700 dark:text-purple-400">লাভ (মার্জিন)</th>
+                )}
                 <th className="py-3 px-3.5 font-semibold">স্ট্যাটাস</th>
                 <th className="py-3 px-3.5 font-semibold text-right">অ্যাকশন</th>
               </tr>
@@ -253,7 +293,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-slate-400">
+                  <td colSpan={canViewBuyPrice ? 9 : 7} className="py-12 text-center text-slate-400">
                     কোনো পণ্য পাওয়া যায়নি
                   </td>
                 </tr>
@@ -339,9 +379,11 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                       </td>
 
                       {/* Purchase Price (কেনা দাম) */}
-                      <td className="py-2.5 px-3.5 font-semibold text-amber-700 dark:text-amber-400 tabular-nums">
-                        {formatMoney(p.purchasePrice, currencySymbol)}
-                      </td>
+                      {canViewBuyPrice && (
+                        <td className="py-2.5 px-3.5 font-semibold text-amber-700 dark:text-amber-400 tabular-nums">
+                          {formatMoney(p.purchasePrice, currencySymbol)}
+                        </td>
+                      )}
 
                       {/* Sale Price (বিক্রয় মূল্য) */}
                       <td className="py-2.5 px-3.5 font-bold text-slate-900 dark:text-slate-100 tabular-nums">
@@ -349,16 +391,18 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                       </td>
 
                       {/* Profit Margin (লাভ / মার্জিন) */}
-                      <td className="py-2.5 px-3.5 tabular-nums">
-                        <span className={`font-semibold ${marginAmt >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600'}`}>
-                          +{formatMoney(marginAmt, currencySymbol)}
-                        </span>
-                        {pCost > 0 && (
-                          <span className="block text-[10px] text-slate-400 font-medium">
-                            {marginPct}% মার্জিন
+                      {canViewBuyPrice && (
+                        <td className="py-2.5 px-3.5 tabular-nums">
+                          <span className={`font-semibold ${marginAmt >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600'}`}>
+                            +{formatMoney(marginAmt, currencySymbol)}
                           </span>
-                        )}
-                      </td>
+                          {pCost > 0 && (
+                            <span className="block text-[10px] text-slate-400 font-medium">
+                              {marginPct}% মার্জিন
+                            </span>
+                          )}
+                        </td>
+                      )}
 
                       {/* Status */}
                       <td className="py-2.5 px-3.5">

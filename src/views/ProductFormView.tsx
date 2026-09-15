@@ -16,6 +16,7 @@ import { Product, Supplier, Language } from '../types';
 import { generateSku, generateBarcode, formatMoney, translations } from '../utils/formatters';
 import { addProduct, updateProduct } from '../services/storage';
 import { ImageUploadWidget } from '../components/ImageUploadWidget';
+import { useAuth } from '../context/AuthContext';
 
 interface ProductFormViewProps {
   initialProduct?: Product | null;
@@ -35,6 +36,7 @@ export const ProductFormView: React.FC<ProductFormViewProps> = ({
   onSaved,
 }) => {
   const t = translations[lang];
+  const { canViewBuyPrice } = useAuth();
   const isEditing = Boolean(initialProduct);
 
   const [name, setName] = useState(initialProduct?.name || '');
@@ -327,21 +329,23 @@ export const ProductFormView: React.FC<ProductFormViewProps> = ({
             মূল্য ও লাভ (Pricing)
           </h3>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-amber-700 dark:text-amber-400 mb-1">
-                কেনা দাম / ক্রয় মূল্য ({currencySymbol}) *
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                required
-                value={purchasePrice}
-                onChange={(e) => setPurchasePrice(Number(e.target.value))}
-                className="w-full text-xs font-bold text-amber-800 dark:text-amber-300 px-3 py-2 bg-amber-50/40 dark:bg-amber-950/20 border border-amber-300 dark:border-amber-800 rounded-xl focus:outline-none focus:ring-1 focus:ring-amber-500 tabular-nums"
-              />
-            </div>
+          <div className={`grid grid-cols-1 ${canViewBuyPrice ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-4`}>
+            {canViewBuyPrice && (
+              <div>
+                <label className="block text-xs font-semibold text-amber-700 dark:text-amber-400 mb-1">
+                  কেনা দাম / ক্রয় মূল্য ({currencySymbol}) *
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  required
+                  value={purchasePrice}
+                  onChange={(e) => setPurchasePrice(Number(e.target.value))}
+                  className="w-full text-xs font-bold text-amber-800 dark:text-amber-300 px-3 py-2 bg-amber-50/40 dark:bg-amber-950/20 border border-amber-300 dark:border-amber-800 rounded-xl focus:outline-none focus:ring-1 focus:ring-amber-500 tabular-nums"
+                />
+              </div>
+            )}
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
@@ -375,24 +379,26 @@ export const ProductFormView: React.FC<ProductFormViewProps> = ({
           </div>
 
           {/* Real-time Profit & Margin Breakdown */}
-          <div className="p-3 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-between flex-wrap gap-2 text-xs">
-            <div className="flex items-center gap-2">
-              <span className="text-slate-500 dark:text-slate-400">প্রতি ইউনিটে লাভ বিশ্লেষণ:</span>
-              <span className="font-semibold text-amber-700 dark:text-amber-400">কেনা: {formatMoney(purchasePrice, currencySymbol)}</span>
-              <span>→</span>
-              <span className="font-semibold text-emerald-700 dark:text-emerald-400">বিক্রয়: {formatMoney(salePrice, currencySymbol)}</span>
-            </div>
-            <div className="flex items-center gap-2 font-bold">
-              <span className={salePrice >= purchasePrice ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600'}>
-                একক লাভ: {formatMoney(salePrice - purchasePrice, currencySymbol)}
-              </span>
-              {purchasePrice > 0 && (
-                <span className="px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 text-[11px]">
-                  {Math.round(((salePrice - purchasePrice) / purchasePrice) * 100)}% মার্জিন
+          {canViewBuyPrice && (
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-between flex-wrap gap-2 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="text-slate-500 dark:text-slate-400">প্রতি ইউনিটে লাভ বিশ্লেষণ:</span>
+                <span className="font-semibold text-amber-700 dark:text-amber-400">কেনা: {formatMoney(purchasePrice, currencySymbol)}</span>
+                <span>→</span>
+                <span className="font-semibold text-emerald-700 dark:text-emerald-400">বিক্রয়: {formatMoney(salePrice, currencySymbol)}</span>
+              </div>
+              <div className="flex items-center gap-2 font-bold">
+                <span className={salePrice >= purchasePrice ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600'}>
+                  একক লাভ: {formatMoney(salePrice - purchasePrice, currencySymbol)}
                 </span>
-              )}
+                {purchasePrice > 0 && (
+                  <span className="px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 text-[11px]">
+                    {Math.round(((salePrice - purchasePrice) / purchasePrice) * 100)}% মার্জিন
+                  </span>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
             <div>

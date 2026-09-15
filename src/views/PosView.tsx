@@ -49,7 +49,7 @@ export const PosView: React.FC<PosViewProps> = ({
   onOpenAuthModal,
 }) => {
   const t = translations[lang];
-  const { sellerName, currentUser, userProfile, isPOSAuthorized, loading: authLoading } = useAuth();
+  const { sellerName, currentUser, userProfile, isPOSAuthorized, loading: authLoading, canViewBuyPrice } = useAuth();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -457,7 +457,7 @@ export const PosView: React.FC<PosViewProps> = ({
                       {p.currentStock} {p.unitName}
                     </span>
                   </div>
-                  {p.purchasePrice !== undefined && (
+                  {canViewBuyPrice && p.purchasePrice !== undefined && (
                     <div className="text-[10px] text-amber-700/80 dark:text-amber-400/80 font-medium mt-0.5 text-left">
                       কেনা: {formatMoney(p.purchasePrice, currencySymbol)}
                     </div>

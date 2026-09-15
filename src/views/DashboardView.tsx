@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Product, Sale, Customer, Language } from '../types';
 import { formatMoney, formatDate, translations } from '../utils/formatters';
+import { useAuth } from '../context/AuthContext';
 
 interface DashboardViewProps {
   products?: Product[];
@@ -38,6 +39,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onAdjustStockModal,
 }) => {
   const t = translations[lang];
+  const { canViewBuyPrice } = useAuth();
 
   // Calculations
   const todayStr = new Date().toISOString().split('T')[0];
@@ -189,58 +191,60 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </div>
 
       {/* Admin Inventory & Purchase Valuation Banner */}
-      <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-700/60">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-700/80">
-          <div>
-            <h3 className="font-bold text-sm text-slate-100 flex items-center gap-2">
-              <Boxes className="w-4 h-4 text-emerald-400" />
-              এডমিন ইনভেন্টরি ও কেনা দাম হিসাব
-            </h3>
-            <p className="text-xs text-slate-400">
-              বর্তমান মজুদ পণ্যের ক্রয় মূল্য (কেনা দাম), বিক্রয় মূল্য এবং সম্ভাব্য মোট মুনাফা
-            </p>
+      {canViewBuyPrice && (
+        <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-700/60">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-700/80">
+            <div>
+              <h3 className="font-bold text-sm text-slate-100 flex items-center gap-2">
+                <Boxes className="w-4 h-4 text-emerald-400" />
+                এডমিন ইনভেন্টরি ও কেনা দাম হিসাব
+              </h3>
+              <p className="text-xs text-slate-400">
+                বর্তমান মজুদ পণ্যের ক্রয় মূল্য (কেনা দাম), বিক্রয় মূল্য এবং সম্ভাব্য মোট মুনাফা
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => onNavigate('stock')}
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer w-fit"
+            >
+              ইনভেন্টরি অডিট <ArrowUpRight className="w-3.5 h-3.5" />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => onNavigate('stock')}
-            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer w-fit"
-          >
-            ইনভেন্টরি অডিট <ArrowUpRight className="w-3.5 h-3.5" />
-          </button>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-3.5">
+            <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/50">
+              <span className="text-[11px] font-semibold text-amber-400 flex items-center gap-1.5">
+                <Wallet className="w-3.5 h-3.5" /> মোট স্টক কেনা দাম (ক্রয় মূল্য)
+              </span>
+              <div className="text-lg sm:text-xl font-black text-slate-100 mt-1 tabular-nums">
+                {formatMoney(totalStockPurchaseValue, currencySymbol)}
+              </div>
+              <p className="text-[10px] text-slate-400 mt-0.5">মজুদ পণ্যে মোট আর্থিক বিনিয়োগ</p>
+            </div>
+
+            <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/50">
+              <span className="text-[11px] font-semibold text-emerald-400 flex items-center gap-1.5">
+                <DollarSign className="w-3.5 h-3.5" /> মোট স্টক বিক্রয় মূল্য
+              </span>
+              <div className="text-lg sm:text-xl font-black text-slate-100 mt-1 tabular-nums">
+                {formatMoney(totalStockSaleValue, currencySymbol)}
+              </div>
+              <p className="text-[10px] text-slate-400 mt-0.5">সব পণ্য বিক্রিত হলে প্রাপ্ত মূল্য</p>
+            </div>
+
+            <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/50">
+              <span className="text-[11px] font-semibold text-purple-400 flex items-center gap-1.5">
+                <Coins className="w-3.5 h-3.5" /> সম্ভাব্য নিট মুনাফা (প্রফিট)
+              </span>
+              <div className="text-lg sm:text-xl font-black text-emerald-400 mt-1 tabular-nums">
+                +{formatMoney(totalEstimatedProfit, currencySymbol)}
+              </div>
+              <p className="text-[10px] text-slate-400 mt-0.5">বিক্রয় মূল্য ও কেনা দামের ব্যবধান</p>
+            </div>
+          </div>
         </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-3.5">
-          <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/50">
-            <span className="text-[11px] font-semibold text-amber-400 flex items-center gap-1.5">
-              <Wallet className="w-3.5 h-3.5" /> মোট স্টক কেনা দাম (ক্রয় মূল্য)
-            </span>
-            <div className="text-lg sm:text-xl font-black text-slate-100 mt-1 tabular-nums">
-              {formatMoney(totalStockPurchaseValue, currencySymbol)}
-            </div>
-            <p className="text-[10px] text-slate-400 mt-0.5">মজুদ পণ্যে মোট আর্থিক বিনিয়োগ</p>
-          </div>
-
-          <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/50">
-            <span className="text-[11px] font-semibold text-emerald-400 flex items-center gap-1.5">
-              <DollarSign className="w-3.5 h-3.5" /> মোট স্টক বিক্রয় মূল্য
-            </span>
-            <div className="text-lg sm:text-xl font-black text-slate-100 mt-1 tabular-nums">
-              {formatMoney(totalStockSaleValue, currencySymbol)}
-            </div>
-            <p className="text-[10px] text-slate-400 mt-0.5">সব পণ্য বিক্রিত হলে প্রাপ্ত মূল্য</p>
-          </div>
-
-          <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/50">
-            <span className="text-[11px] font-semibold text-purple-400 flex items-center gap-1.5">
-              <Coins className="w-3.5 h-3.5" /> সম্ভাব্য নিট মুনাফা (প্রফিট)
-            </span>
-            <div className="text-lg sm:text-xl font-black text-emerald-400 mt-1 tabular-nums">
-              +{formatMoney(totalEstimatedProfit, currencySymbol)}
-            </div>
-            <p className="text-[10px] text-slate-400 mt-0.5">বিক্রয় মূল্য ও কেনা দামের ব্যবধান</p>
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* Visual Chart & Quick Shortcuts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">

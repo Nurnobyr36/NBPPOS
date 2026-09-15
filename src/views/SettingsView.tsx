@@ -12,6 +12,9 @@ import {
   AlertCircle,
   Image as ImageIcon,
   Trash2,
+  Users,
+  ShieldCheck,
+  KeyRound,
 } from 'lucide-react';
 import { ShopSettings, Language } from '../types';
 import {
@@ -26,12 +29,14 @@ import {
 import { clearAllFirestoreMockData } from '../services/firebase';
 import { DEFAULT_IMGBB_KEY } from '../services/imgbb';
 import { ImageUploadWidget } from '../components/ImageUploadWidget';
+import { useAuth } from '../context/AuthContext';
 
 interface SettingsViewProps {
   settings: ShopSettings;
   lang: Language;
   onSaved: (updated: ShopSettings) => void;
   onResetDemo: () => void;
+  onOpenStaffManagement?: () => void;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
@@ -39,7 +44,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   lang,
   onSaved,
   onResetDemo,
+  onOpenStaffManagement,
 }) => {
+  const { canManageStaff, staffAccounts, currentUser, userProfile } = useAuth();
   const [shopName, setShopName] = useState(settings.shopName || '');
   const [tagline, setTagline] = useState(settings.tagline || '');
   const [ownerName, setOwnerName] = useState(settings.ownerName || '');
@@ -306,6 +313,37 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <ExternalLink className="w-3.5 h-3.5" />
           </a>
         </div>
+
+        {/* Staff Management Section for Designated Admins */}
+        {canManageStaff && (
+          <div className="bg-gradient-to-br from-white to-emerald-50/40 dark:from-slate-900 dark:to-emerald-950/20 border-2 border-emerald-200 dark:border-emerald-800/80 rounded-2xl p-5 shadow-2xs space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2 border-b border-emerald-100 dark:border-emerald-900/60 pb-2.5">
+              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                <Users className="w-4 h-4 text-emerald-600" />
+                স্টাফ আইডি ও বিক্রয়কর্মী পরিচালনা (Staff Management)
+              </h3>
+              <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-bold border border-emerald-300 dark:border-emerald-700">
+                মোট স্টাফ: {staffAccounts.length} জন
+              </span>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              অনুমোদিত এডমিন হিসেবে আপনি ক্যাশিয়ার ও বিক্রয়কর্মীদের জন্য নতুন স্টাফ আইডি ও পিন কোড তৈরি করতে পারবেন। স্টাফরা তাদের আইডি ও পিন দিয়ে POS-এ বিক্রি করতে পারবে, তবে <strong>পণ্যের কেনা দাম (ক্রয় মূল্য) এবং আর্থিক লাভ কখনো দেখতে পাবে না</strong>।
+            </p>
+
+            <div className="pt-1">
+              <button
+                type="button"
+                id="settings-open-staff-modal-btn"
+                onClick={onOpenStaffManagement}
+                className="px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-2 cursor-pointer transition-colors"
+              >
+                <ShieldCheck className="w-4 h-4 text-emerald-300" />
+                <span>স্টাফ আইডি তৈরি ও পরিচালনা উইন্ডো খুলুন</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Backup & Demo Reset */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-2xs space-y-3">

@@ -10,9 +10,9 @@ import {
   updateProfile,
   signOut as fbSignOut,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, collection, getDocs } from 'firebase/firestore';
-import { auth, db, handleFirestoreError, OperationType } from '../services/firebase';
-import { UserProfile } from '../types';
+import { doc, setDoc, getDoc, collection, getDocs, onSnapshot, deleteDoc } from 'firebase/firestore';
+import { auth, db } from '../services/firebase';
+import { UserProfile, StaffAccount, DESIGNATED_ADMIN_EMAILS, isDesignatedAdminEmail } from '../types';
 
 interface AuthContextType {
   currentUser: User | null;
@@ -21,6 +21,26 @@ interface AuthContextType {
   isSuperAdmin: boolean;
   isAdminOrSuperAdmin: boolean;
   isPOSAuthorized: boolean;
+  
+  // Strict permission: Only the 4 designated admin emails can view purchase price
+  canViewBuyPrice: boolean;
+  // Strict permission: Only the 4 designated admin emails can open staff IDs
+  canManageStaff: boolean;
+
+  // Staff accounts management
+  staffAccounts: StaffAccount[];
+  loadingStaff: boolean;
+  createStaffAccount: (data: {
+    staffCode: string;
+    name: string;
+    pin: string;
+    role: 'cashier' | 'seller';
+    phone?: string;
+  }) => Promise<void>;
+  deleteStaffAccount: (id: string) => Promise<void>;
+  updateStaffAccount: (id: string, updates: Partial<StaffAccount>) => Promise<void>;
+  loginWithStaffCode: (staffCode: string, pin: string) => Promise<void>;
+
   loginWithGoogle: () => Promise<void>;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
   registerWithEmail: (name: string, email: string, pass: string, role?: 'super_admin' | 'admin' | 'cashier' | 'seller') => Promise<void>;
@@ -32,6 +52,7 @@ interface AuthContextType {
 }
 
 const LOCAL_SELLER_KEY = 'smartshop_active_seller_profile';
+const LOCAL_STAFF_KEY = 'smartshop_staff_accounts_cache';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -47,6 +68,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
   const [loading, setLoading] = useState(true);
   const [hasAnySuperAdmin, setHasAnySuperAdmin] = useState(false);
+
+  // Staff accounts
+  const [staffAccounts, setStaffAccounts] = useState<StaffAccount[]>(() => {
+    try {
+      const cached = localStorage.getItem(LOCAL_STAFF_KEY);
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [loadingStaff, setLoadingStaff] = useState(false);
 
   // Sync profile to localStorage and firestore
   const persistProfile = async (profile: UserProfile) => {
@@ -68,6 +100,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Real-time Staff Accounts listener
+  useEffect(() => {
+    setLoadingStaff(true);
+    let unsub = () => {};
+    try {
+      unsub = onSnapshot(
+        collection(db, 'staff_accounts'),
+        (snapshot) => {
+          const list: StaffAccount[] = [];
+          snapshot.forEach((d) => {
+            const data = d.data() as StaffAccount;
+            if (data && data.staffCode) {
+              list.push({ ...data, id: d.id });
+            }
+          });
+          list.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+          setStaffAccounts(list);
+          try {
+            localStorage.setItem(LOCAL_STAFF_KEY, JSON.stringify(list));
+          } catch (e) {
+            console.warn('Local staff save warning:', e);
+          }
+          setLoadingStaff(false);
+        },
+        (err) => {
+          console.warn('Staff accounts listener warning:', err);
+          setLoadingStaff(false);
+        }
+      );
+    } catch (err) {
+      console.warn('Staff listener setup error:', err);
+      setLoadingStaff(false);
+    }
+
+    return () => unsub();
+  }, []);
+
   // Check if system has any super admin registered
   const checkSuperAdminStatus = async () => {
     try {
@@ -75,7 +144,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       let found = false;
       usersSnap.forEach((docSnap) => {
         const d = docSnap.data();
-        if (d.role === 'super_admin') {
+        if (d.role === 'super_admin' || isDesignatedAdminEmail(d.email)) {
           found = true;
         }
       });
@@ -96,9 +165,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           const userDocRef = doc(db, 'users', user.uid);
           const snap = await getDoc(userDocRef);
-
-          // Check if there are any users or if this user is designated super_admin
           const hasAdmin = await checkSuperAdminStatus();
+
+          // CRITICAL: Check if this user's email is one of the 4 designated admin emails
+          const isDesignated = isDesignatedAdminEmail(user.email);
 
           if (snap.exists()) {
             const data = snap.data() as UserProfile;
@@ -107,19 +177,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               displayName: data.displayName || user.displayName || user.email?.split('@')[0] || 'বিক্রেতা',
               email: user.email,
               photoURL: user.photoURL,
-              role: data.role || (hasAdmin ? 'cashier' : 'super_admin'),
+              // If email is in designated list, ALWAYS give super_admin. Otherwise honor saved or cashier
+              role: isDesignated ? 'super_admin' : data.role || (hasAdmin ? 'cashier' : 'super_admin'),
+              isDesignatedAdmin: isDesignated,
             };
             setUserProfile(updatedProfile);
             localStorage.setItem(LOCAL_SELLER_KEY, JSON.stringify(updatedProfile));
           } else {
-            // If first user, make them super_admin by default so shop owner has full control
-            const defaultRole = hasAdmin ? 'cashier' : 'super_admin';
+            // First time this firebase user logged in
+            const defaultRole = isDesignated ? 'super_admin' : (hasAdmin ? 'cashier' : 'super_admin');
             const newProfile: UserProfile = {
               uid: user.uid,
-              displayName: user.displayName || user.email?.split('@')[0] || (defaultRole === 'super_admin' ? 'সুপার এডমিন' : 'বিক্রেতা'),
+              displayName: user.displayName || user.email?.split('@')[0] || (isDesignated ? 'সুপার এডমিন' : 'বিক্রেতা'),
               email: user.email,
               photoURL: user.photoURL,
               role: defaultRole,
+              isDesignatedAdmin: isDesignated,
             };
             await persistProfile(newProfile);
             if (defaultRole === 'super_admin') {
@@ -128,12 +201,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         } catch (err) {
           console.warn('Error fetching user profile doc:', err);
+          const isDesignated = isDesignatedAdminEmail(user.email);
           const fallbackProfile: UserProfile = {
             uid: user.uid,
             displayName: user.displayName || user.email?.split('@')[0] || 'বিক্রেতা',
             email: user.email,
             photoURL: user.photoURL,
-            role: 'cashier',
+            role: isDesignated ? 'super_admin' : 'cashier',
+            isDesignatedAdmin: isDesignated,
           };
           setUserProfile(fallbackProfile);
         }
@@ -161,22 +236,162 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, []);
 
+  // Strict check: Is the current active session one of the 4 designated admin emails?
+  // "Nurnobyr36@gmail.com, Sabihait20@gmail.com, Admin@nihadbp.top, Musicnrs2020@gmail.com"
+  const isDesignatedActiveAdmin = useMemo(() => {
+    const activeEmail = currentUser?.email || userProfile?.email;
+    return isDesignatedAdminEmail(activeEmail);
+  }, [currentUser?.email, userProfile?.email]);
+
+  // "শুধু মাত্র এই মেইল গুলা দিয়ে লগিন করলে কিনা দাম দেখা যাবে বাকীগুলা দিয়ে শুধু বিক্রির দাম দেখা যাবে"
+  const canViewBuyPrice = useMemo(() => {
+    return isDesignatedActiveAdmin;
+  }, [isDesignatedActiveAdmin]);
+
+  // "আর এগুলা দিয়ে লগিন করলে যাতে স্টাফ আইডি খোলা যায় এমন সিস্টেম করো"
+  const canManageStaff = useMemo(() => {
+    return isDesignatedActiveAdmin;
+  }, [isDesignatedActiveAdmin]);
+
   // Is current active session a Super Admin
   const isSuperAdmin = useMemo(() => {
-    return userProfile?.role === 'super_admin';
-  }, [userProfile]);
+    return isDesignatedActiveAdmin;
+  }, [isDesignatedActiveAdmin]);
 
   // Is current active session Admin or Super Admin
   const isAdminOrSuperAdmin = useMemo(() => {
-    return userProfile?.role === 'super_admin' || userProfile?.role === 'admin';
-  }, [userProfile]);
+    return isDesignatedActiveAdmin || userProfile?.role === 'admin';
+  }, [isDesignatedActiveAdmin, userProfile]);
 
   // Is POS authorized? User MUST be logged in (either Firebase auth or valid profile)
   const isPOSAuthorized = useMemo(() => {
     if (loading) return false;
-    // Must have a logged in user with valid profile
     return !!(currentUser || userProfile?.uid);
   }, [loading, currentUser, userProfile]);
+
+  // Create Staff Account (Only allowed for designated admin emails)
+  const createStaffAccount = async (data: {
+    staffCode: string;
+    name: string;
+    pin: string;
+    role: 'cashier' | 'seller';
+    phone?: string;
+  }) => {
+    if (!canManageStaff) {
+      throw new Error(
+        'নিরাপত্তা সতর্কবার্তা: শুধুমাত্র অনুমোদিত ৪টি এডমিন ইমেইল দিয়ে লগইন করলে স্টাফ আইডি তৈরি করা যাবে।'
+      );
+    }
+
+    const codeClean = data.staffCode.trim().toUpperCase();
+    const nameClean = data.name.trim();
+    const pinClean = data.pin.trim();
+
+    if (!codeClean) throw new Error('অনুগ্রহ করে স্টাফ কোড বা আইডি দিন (যেমন: STF-01)');
+    if (!nameClean) throw new Error('স্টাফের পুরো নাম প্রদান করুন');
+    if (!pinClean || pinClean.length < 3) throw new Error('কমপক্ষে ৩ বা ৪ ডিজিটের পিন কোড দিন');
+
+    // Check code duplication
+    const exists = staffAccounts.some((s) => s.staffCode.toUpperCase() === codeClean);
+    if (exists) {
+      throw new Error(`স্টাফ কোড "${codeClean}" ইতিমধ্যে অন্য স্টাফের জন্য ব্যবহৃত হচ্ছে। নতুন কোড দিন।`);
+    }
+
+    const currentAdminEmail = currentUser?.email || userProfile?.email || 'admin';
+    const staffId = 'staff_' + Date.now();
+    const newStaff: StaffAccount = {
+      id: staffId,
+      staffCode: codeClean,
+      name: nameClean,
+      pin: pinClean,
+      role: data.role || 'cashier',
+      phone: data.phone?.trim() || '',
+      status: 'active',
+      createdByEmail: currentAdminEmail,
+      createdAt: new Date().toISOString(),
+    };
+
+    await setDoc(doc(db, 'staff_accounts', staffId), newStaff);
+  };
+
+  // Delete Staff Account
+  const deleteStaffAccount = async (id: string) => {
+    if (!canManageStaff) {
+      throw new Error('শুধুমাত্র অনুমোদিত এডমিন ইমেইল স্টাফ আইডি ডিলিট করতে পারবেন!');
+    }
+    await deleteDoc(doc(db, 'staff_accounts', id));
+  };
+
+  // Update Staff Account (e.g. status active/suspended)
+  const updateStaffAccount = async (id: string, updates: Partial<StaffAccount>) => {
+    if (!canManageStaff) {
+      throw new Error('শুধুমাত্র অনুমোদিত এডমিন ইমেইল স্টাফ তথ্য আপডেট করতে পারবেন!');
+    }
+    await setDoc(doc(db, 'staff_accounts', id), updates, { merge: true });
+  };
+
+  // Login with Staff Code and PIN
+  const loginWithStaffCode = async (staffCode: string, pin: string) => {
+    const codeClean = staffCode.trim().toUpperCase();
+    const pinClean = pin.trim();
+
+    if (!codeClean) throw new Error('স্টাফ কোড বা আইডি প্রদান করুন');
+    if (!pinClean) throw new Error('পিন কোড প্রদান করুন');
+
+    // Search in local state or fetch from firestore
+    let matched = staffAccounts.find((s) => s.staffCode.toUpperCase() === codeClean);
+    if (!matched) {
+      const snap = await getDocs(collection(db, 'staff_accounts'));
+      snap.forEach((d) => {
+        const data = d.data() as StaffAccount;
+        if (data.staffCode && data.staffCode.toUpperCase() === codeClean) {
+          matched = { ...data, id: d.id };
+        }
+      });
+    }
+
+    if (!matched) {
+      throw new Error(`"${codeClean}" কোডের কোনো স্টাফ আইডি পাওয়া যায়নি!`);
+    }
+
+    if (matched.status === 'suspended') {
+      throw new Error('এই স্টাফ অ্যাকাউন্টটি বর্তমানে স্থগিত (Inactive/Suspended) রয়েছে। এডমিনের সাথে যোগাযোগ করুন।');
+    }
+
+    if (matched.pin.trim() !== pinClean) {
+      throw new Error('ভুল পিন কোড! অনুগ্রহ করে সঠিক পিন দিয়ে চেষ্টা করুন।');
+    }
+
+    // Update lastLoginAt
+    try {
+      await setDoc(
+        doc(db, 'staff_accounts', matched.id),
+        { lastLoginAt: new Date().toISOString() },
+        { merge: true }
+      );
+    } catch (e) {
+      console.warn('Error updating lastLoginAt:', e);
+    }
+
+    // If a firebase session was logged in, sign it out to switch to staff identity cleanly
+    if (currentUser) {
+      try {
+        await fbSignOut(auth);
+      } catch {}
+    }
+
+    const staffProfile: UserProfile = {
+      uid: 'staff-' + matched.id,
+      displayName: matched.name,
+      email: null, // Staff has no designated admin email, so buy price will be strictly HIDDEN
+      staffCode: matched.staffCode,
+      role: matched.role || 'cashier',
+      isDesignatedAdmin: false,
+      phoneNumber: matched.phone || null,
+    };
+
+    await persistProfile(staffProfile);
+  };
 
   // Google Login
   const loginWithGoogle = async () => {
@@ -185,14 +400,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const res = await signInWithPopup(auth, provider);
       if (res.user) {
-        // Fetch existing role or assign
+        const isDesignated = isDesignatedAdminEmail(res.user.email);
         const userDocRef = doc(db, 'users', res.user.uid);
         const snap = await getDoc(userDocRef);
         let userRole: 'super_admin' | 'admin' | 'cashier' | 'seller' = 'cashier';
-        if (snap.exists()) {
+        if (isDesignated) {
+          userRole = 'super_admin';
+        } else if (snap.exists()) {
           userRole = (snap.data().role as any) || 'cashier';
         } else {
-          userRole = hasAnySuperAdmin ? 'cashier' : 'super_admin';
+          userRole = 'cashier';
         }
 
         const prof: UserProfile = {
@@ -201,6 +418,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           email: res.user.email,
           photoURL: res.user.photoURL,
           role: userRole,
+          isDesignatedAdmin: isDesignated,
         };
         await persistProfile(prof);
       }
@@ -218,13 +436,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginWithEmail = async (email: string, pass: string) => {
     const res = await signInWithEmailAndPassword(auth, email, pass);
     if (res.user) {
+      const isDesignated = isDesignatedAdminEmail(res.user.email);
       const userDocRef = doc(db, 'users', res.user.uid);
       const snap = await getDoc(userDocRef);
-      let userRole: 'super_admin' | 'admin' | 'cashier' | 'seller' = 'cashier';
+      let userRole: 'super_admin' | 'admin' | 'cashier' | 'seller' = isDesignated ? 'super_admin' : 'cashier';
       let name = res.user.displayName || email.split('@')[0] || 'বিক্রেতা';
       if (snap.exists()) {
         const data = snap.data();
-        if (data.role) userRole = data.role;
+        if (isDesignated) {
+          userRole = 'super_admin';
+        } else if (data.role) {
+          userRole = data.role;
+        }
         if (data.displayName) name = data.displayName;
       }
 
@@ -234,33 +457,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email: res.user.email,
         photoURL: res.user.photoURL,
         role: userRole,
+        isDesignatedAdmin: isDesignated,
       };
       await persistProfile(prof);
     }
   };
 
-  // Register with email (Restricted to Super Admin or first initial setup)
+  // Register with email (Restricted to designated Super Admin)
   const registerWithEmail = async (
     name: string,
     email: string,
     pass: string,
     role: 'super_admin' | 'admin' | 'cashier' | 'seller' = 'cashier'
   ) => {
-    // Only Super Admin can register new accounts if a super admin already exists
-    if (hasAnySuperAdmin && !isSuperAdmin) {
-      throw new Error('শুধুমাত্র সুপার এডমিন নতুন অ্যাকাউন্ট তৈরি করতে পারেন!');
+    if (!canManageStaff) {
+      throw new Error('শুধুমাত্র অনুমোদিত ৪টি এডমিন ইমেইল দিয়ে নতুন অ্যাকাউন্ট তৈরি করতে পারেন!');
     }
 
     const res = await createUserWithEmailAndPassword(auth, email, pass);
     if (res.user) {
       await updateProfile(res.user, { displayName: name });
-      const finalRole = !hasAnySuperAdmin ? 'super_admin' : role;
+      const isDesignated = isDesignatedAdminEmail(email);
+      const finalRole = isDesignated ? 'super_admin' : role;
       const prof: UserProfile = {
         uid: res.user.uid,
         displayName: name,
         email: res.user.email,
         photoURL: res.user.photoURL,
         role: finalRole,
+        isDesignatedAdmin: isDesignated,
       };
       await persistProfile(prof);
       if (finalRole === 'super_admin') {
@@ -279,9 +504,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const prof: UserProfile = {
       uid: profileId,
       displayName: cleanName,
-      email: null,
+      email: null, // Quick cashiers NEVER have designated admin email, so buy price is strictly hidden
       photoURL: null,
-      role,
+      role: 'cashier', // Always cashier, cannot elevate to admin
+      isDesignatedAdmin: false,
     };
     await persistProfile(prof);
   };
@@ -331,6 +557,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isSuperAdmin,
         isAdminOrSuperAdmin,
         isPOSAuthorized,
+        canViewBuyPrice,
+        canManageStaff,
+        staffAccounts,
+        loadingStaff,
+        createStaffAccount,
+        deleteStaffAccount,
+        updateStaffAccount,
+        loginWithStaffCode,
         loginWithGoogle,
         loginWithEmail,
         registerWithEmail,
@@ -353,4 +587,3 @@ export const useAuth = () => {
   }
   return context;
 };
-
