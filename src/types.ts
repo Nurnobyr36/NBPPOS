@@ -106,7 +106,7 @@ export interface StaffAccount {
   staffCode: string; // e.g. STF-101 or cashier username
   name: string;
   pin: string; // 4-6 digit numeric pin or password
-  role: 'cashier' | 'seller';
+  role: 'admin' | 'cashier' | 'seller';
   phone?: string;
   status: 'active' | 'suspended';
   createdByEmail: string;

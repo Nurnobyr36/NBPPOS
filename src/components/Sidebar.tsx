@@ -248,8 +248,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <Crown className="w-3 h-3 text-amber-400" />
                       সুপার এডমিন
                     </span>
-                  ) : userProfile?.role === 'admin' ? (
-                    'এডমিন'
+                  ) : userProfile?.role === 'admin' || userProfile?.staffCode ? (
+                    <span className="text-emerald-300 font-bold">এডমিন</span>
                   ) : (
                     'ক্যাশিয়ার'
                   )}

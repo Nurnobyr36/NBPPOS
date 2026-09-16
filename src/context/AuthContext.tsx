@@ -243,28 +243,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return isDesignatedAdminEmail(activeEmail);
   }, [currentUser?.email, userProfile?.email]);
 
-  // "শুধু মাত্র এই মেইল গুলা দিয়ে লগিন করলে কিনা দাম দেখা যাবে বাকীগুলা দিয়ে শুধু বিক্রির দাম দেখা যাবে"
-  // Cashier staff PIN accounts only see selling prices. Owner/Admins and designated emails can see and manage buy prices.
+  // "স্টাফ আইডিতে সমস্ত এক্সেস দিয়ে দাও এডমিনের মত"
+  // Both designated admins and staff accounts have full access to view buy prices, profit, and reports
   const canViewBuyPrice = useMemo(() => {
-    if (userProfile?.staffCode || (userProfile?.role === 'cashier' && !isDesignatedActiveAdmin)) {
-      return false;
-    }
     return true;
-  }, [userProfile, isDesignatedActiveAdmin]);
+  }, []);
 
-  // "আর এগুলা দিয়ে লগিন করলে যাতে স্টাফ আইডি খোলা যায় এমন সিস্টেম করো"
+  // Staff and Admins can create and manage staff accounts
   const canManageStaff = useMemo(() => {
-    return isDesignatedActiveAdmin;
-  }, [isDesignatedActiveAdmin]);
+    return isDesignatedActiveAdmin || userProfile?.role === 'admin' || userProfile?.role === 'super_admin' || !!userProfile?.staffCode;
+  }, [isDesignatedActiveAdmin, userProfile]);
 
   // Is current active session a Super Admin
   const isSuperAdmin = useMemo(() => {
-    return isDesignatedActiveAdmin;
-  }, [isDesignatedActiveAdmin]);
+    return isDesignatedActiveAdmin || userProfile?.role === 'super_admin';
+  }, [isDesignatedActiveAdmin, userProfile]);
 
   // Is current active session Admin or Super Admin
   const isAdminOrSuperAdmin = useMemo(() => {
-    return isDesignatedActiveAdmin || userProfile?.role === 'admin';
+    return isDesignatedActiveAdmin || userProfile?.role === 'admin' || userProfile?.role === 'super_admin' || !!userProfile?.staffCode;
   }, [isDesignatedActiveAdmin, userProfile]);
 
   // Is POS authorized? User MUST be logged in (either Firebase auth or valid profile)
@@ -273,17 +270,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return !!(currentUser || userProfile?.uid);
   }, [loading, currentUser, userProfile]);
 
-  // Create Staff Account (Only allowed for designated admin emails)
+  // Create Staff Account (Allowed for admins and staff)
   const createStaffAccount = async (data: {
     staffCode: string;
     name: string;
     pin: string;
-    role: 'cashier' | 'seller';
+    role: 'admin' | 'cashier' | 'seller';
     phone?: string;
   }) => {
     if (!canManageStaff) {
       throw new Error(
-        'নিরাপত্তা সতর্কবার্তা: শুধুমাত্র অনুমোদিত ৪টি এডমিন ইমেইল দিয়ে লগইন করলে স্টাফ আইডি তৈরি করা যাবে।'
+        'নিরাপত্তা সতর্কবার্তা: শুধুমাত্র অনুমোদিত এডমিন বা স্টাফ আইডি দিয়ে লগইন করলে স্টাফ অ্যাকাউন্ট তৈরি করা যাবে।'
       );
     }
 
@@ -301,14 +298,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error(`স্টাফ কোড "${codeClean}" ইতিমধ্যে অন্য স্টাফের জন্য ব্যবহৃত হচ্ছে। নতুন কোড দিন।`);
     }
 
-    const currentAdminEmail = currentUser?.email || userProfile?.email || 'admin';
+    const currentAdminEmail = currentUser?.email || userProfile?.email || userProfile?.staffCode || 'admin';
     const staffId = 'staff_' + Date.now();
     const newStaff: StaffAccount = {
       id: staffId,
       staffCode: codeClean,
       name: nameClean,
       pin: pinClean,
-      role: data.role || 'cashier',
+      role: data.role || 'admin',
       phone: data.phone?.trim() || '',
       status: 'active',
       createdByEmail: currentAdminEmail,
@@ -321,7 +318,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Delete Staff Account
   const deleteStaffAccount = async (id: string) => {
     if (!canManageStaff) {
-      throw new Error('শুধুমাত্র অনুমোদিত এডমিন ইমেইল স্টাফ আইডি ডিলিট করতে পারবেন!');
+      throw new Error('শুধুমাত্র অনুমোদিত এডমিন বা স্টাফ আইডি ডিলিট করতে পারবেন!');
     }
     await deleteDoc(doc(db, 'staff_accounts', id));
   };
@@ -329,7 +326,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Update Staff Account (e.g. status active/suspended)
   const updateStaffAccount = async (id: string, updates: Partial<StaffAccount>) => {
     if (!canManageStaff) {
-      throw new Error('শুধুমাত্র অনুমোদিত এডমিন ইমেইল স্টাফ তথ্য আপডেট করতে পারবেন!');
+      throw new Error('শুধুমাত্র অনুমোদিত এডমিন বা স্টাফ তথ্য আপডেট করতে পারবেন!');
     }
     await setDoc(doc(db, 'staff_accounts', id), updates, { merge: true });
   };
@@ -387,10 +384,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const staffProfile: UserProfile = {
       uid: 'staff-' + matched.id,
       displayName: matched.name,
-      email: null, // Staff has no designated admin email, so buy price will be strictly HIDDEN
+      email: matched.staffCode.toLowerCase() + '@smartshop.staff',
       staffCode: matched.staffCode,
-      role: matched.role || 'cashier',
-      isDesignatedAdmin: false,
+      role: 'admin', // Full Admin Access granted to staff
+      isDesignatedAdmin: true,
       phoneNumber: matched.phone || null,
     };
 

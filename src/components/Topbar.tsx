@@ -344,7 +344,7 @@ export const Topbar: React.FC<TopbarProps> = ({
             )}
           </span>
           <span className="hidden sm:inline text-[10px] text-emerald-600 dark:text-emerald-400 font-normal">
-            {userProfile?.role === 'super_admin' ? '(সুপার এডমিন)' : userProfile?.role === 'admin' ? '(এডমিন)' : '(বিক্রেতা)'}
+            {userProfile?.role === 'super_admin' ? '(সুপার এডমিন)' : (userProfile?.role === 'admin' || userProfile?.staffCode) ? '(এডমিন)' : '(বিক্রেতা)'}
           </span>
         </button>
 

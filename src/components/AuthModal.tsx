@@ -278,7 +278,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 className={`px-2 py-0.5 rounded-full text-[10px] font-bold border flex items-center gap-1 ${
                   userProfile?.role === 'super_admin'
                     ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-700'
-                    : userProfile?.role === 'admin'
+                    : (userProfile?.role === 'admin' || userProfile?.staffCode)
                     ? 'bg-purple-100 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300 border-purple-300 dark:border-purple-700'
                     : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
                 }`}
@@ -286,7 +286,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 {userProfile?.role === 'super_admin' && <Crown className="w-3 h-3 text-amber-500" />}
                 {userProfile?.role === 'super_admin'
                   ? 'সুপার এডমিন'
-                  : userProfile?.role === 'admin'
+                  : (userProfile?.role === 'admin' || userProfile?.staffCode)
                   ? 'এডমিন'
                   : 'ক্যাশিয়ার'}
               </span>
@@ -557,7 +557,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <div className="p-2.5 bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 rounded-xl text-[11px] text-emerald-900 dark:text-emerald-300 flex items-start gap-2">
                     <BadgeCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                     <span>
-                      স্টাফ আইডি দিয়ে লগইন করলে বিক্রয় করা যাবে। কিন্তু <strong>পণ্যের কেনা দাম সম্পূর্ণ গোপন থাকবে</strong>।
+                      স্টাফ আইডি দিয়ে লগইন করলে এডমিনের মতো <strong>কেনা দাম, লাভ-ক্ষতি ও সমস্ত ফিচারের পূর্ণ এক্সেস</strong> পাওয়া যাবে।
                     </span>
                   </div>
                 </div>

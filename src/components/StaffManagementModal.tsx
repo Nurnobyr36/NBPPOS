@@ -47,7 +47,7 @@ export const StaffManagementModal: React.FC<StaffManagementModalProps> = ({
   const [name, setName] = useState('');
   const [staffCode, setStaffCode] = useState('');
   const [pin, setPin] = useState('');
-  const [role, setRole] = useState<'cashier' | 'seller'>('cashier');
+  const [role, setRole] = useState<'admin' | 'cashier' | 'seller'>('admin');
   const [phone, setPhone] = useState('');
 
   const [loading, setLoading] = useState(false);
@@ -58,7 +58,7 @@ export const StaffManagementModal: React.FC<StaffManagementModalProps> = ({
 
   if (!isOpen) return null;
 
-  const currentEmail = currentUser?.email || userProfile?.email || '';
+  const currentEmail = currentUser?.email || userProfile?.email || userProfile?.staffCode || '';
 
   // Auto generate next staff code
   const handleAutoGenerateCode = () => {
@@ -89,7 +89,7 @@ export const StaffManagementModal: React.FC<StaffManagementModalProps> = ({
 
     if (!canManageStaff) {
       setError(
-        'নিরাপত্তা সতর্কতা: শুধুমাত্র অনুমোদিত ৪টি এডমিন ইমেইল দিয়ে লগইন করলে স্টাফ আইডি তৈরি করা যাবে।'
+        'নিরাপত্তা সতর্কতা: শুধুমাত্র অনুমোদিত এডমিন বা স্টাফ আইডি দিয়ে লগইন করলে স্টাফ অ্যাকাউন্ট তৈরি করা যাবে।'
       );
       return;
     }
@@ -122,7 +122,7 @@ export const StaffManagementModal: React.FC<StaffManagementModalProps> = ({
       setStaffCode('');
       setPin('');
       setPhone('');
-      setRole('cashier');
+      setRole('admin');
       setTimeout(() => setSuccessMsg(null), 4000);
     } catch (err: any) {
       setError(err.message || 'স্টাফ আইডি তৈরিতে সমস্যা হয়েছে!');
@@ -182,7 +182,7 @@ export const StaffManagementModal: React.FC<StaffManagementModalProps> = ({
             স্টাফ আইডি ও বিক্রয়কর্মী পরিচালনা
           </h2>
           <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-2xl leading-relaxed">
-            ক্যাশিয়ার ও বিক্রয়কর্মীদের জন্য স্বতন্ত্র স্টাফ আইডি ও পিন কোড তৈরি করুন। স্টাফরা এই আইডি দিয়ে পিওএস (POS)-এ বিক্রি করতে পারবে কিন্তু <strong>পণ্যের কেনা দাম (ক্রয় মূল্য) ও মুনাফা দেখতে পাবে না</strong>।
+            ক্যাশিয়ার ও স্টাফদের জন্য স্বতন্ত্র স্টাফ আইডি ও পিন কোড তৈরি করুন। স্টাফ আইডি দিয়ে লগইন করলে এডমিনের মতো <strong>কেনা দাম, লাভ-ক্ষতি, পণ্য ও স্টক পরিচালনাসহ সমস্ত এক্সেস</strong> থাকবে।
           </p>
         </div>
 
@@ -303,8 +303,9 @@ export const StaffManagementModal: React.FC<StaffManagementModalProps> = ({
                         onChange={(e) => setRole(e.target.value as any)}
                         className="w-full text-xs px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:text-slate-100"
                       >
-                        <option value="cashier">ক্যাশিয়ার (POS বিলিং)</option>
-                        <option value="seller">বিক্রয়কর্মী (Sales Staff)</option>
+                        <option value="admin">এডমিন (সমস্ত এক্সেস ও কেনা দাম)</option>
+                        <option value="cashier">ক্যাশিয়ার (POS বিলিং ও এডমিন এক্সেস)</option>
+                        <option value="seller">বিক্রয়কর্মী (বিক্রয় ও এডমিন এক্সেস)</option>
                       </select>
                     </div>
                   </div>
@@ -406,8 +407,8 @@ export const StaffManagementModal: React.FC<StaffManagementModalProps> = ({
                             </td>
 
                             <td className="py-2.5 px-3">
-                              <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-100 dark:bg-blue-950/80 text-blue-800 dark:text-blue-300">
-                                {s.role === 'cashier' ? 'ক্যাশিয়ার' : 'বিক্রয়কর্মী'}
+                              <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                                {s.role === 'admin' ? 'এডমিন (পূর্ণ এক্সেস)' : s.role === 'cashier' ? 'ক্যাশিয়ার (এডমিন এক্সেস)' : 'বিক্রয়কর্মী (এডমিন এক্সেস)'}
                               </span>
                             </td>
 
