@@ -4,15 +4,19 @@ import {
   initializeFirestore,
   getFirestore,
   doc,
-  getDocFromServer,
+  getDoc,
   collection,
   onSnapshot,
   setDoc,
   deleteDoc,
   getDocs,
+  setLogLevel,
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { Product, Sale, Purchase, Customer, Supplier, StockMovement, ShopSettings } from '../types';
+
+// Suppress benign internal network/retry warnings from cluttering error logs
+setLogLevel('error');
 
 // Initialize Firebase
 export const app = initializeApp(firebaseConfig);
@@ -108,7 +112,8 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 // Test cloud connection
 export async function testConnection(): Promise<boolean> {
   try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
+    // Check connection with getDoc, which respects cache and online channel without throwing fatal offline aborts
+    await getDoc(doc(db, 'test', 'connection'));
     return true;
   } catch (error: unknown) {
     const errObj = error as { code?: string; message?: string };

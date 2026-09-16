@@ -109,7 +109,7 @@ export const Topbar: React.FC<TopbarProps> = ({
   return (
     <header
       id="app-topbar"
-      className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-3 sm:px-4 flex items-center justify-between sticky top-0 z-30 shadow-2xs"
+      className="no-print h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-3 sm:px-4 flex items-center justify-between sticky top-0 z-30 shadow-2xs"
     >
       {/* Left: Mobile Menu & Search */}
       <div className="flex items-center gap-2 sm:gap-3 flex-1 max-w-lg">

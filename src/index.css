@@ -1,12 +1,28 @@
 @import "tailwindcss";
 
 @media print {
-  body {
+  html, body {
     background: #ffffff !important;
     color: #000000 !important;
+    height: auto !important;
+    overflow: visible !important;
   }
-  .no-print {
+  .no-print,
+  #app-sidebar,
+  #sidebar-mobile-backdrop,
+  #app-topbar,
+  header,
+  aside,
+  nav {
     display: none !important;
+  }
+  /* Ensure parent layout wrappers do not constrain or clip print page */
+  div.h-screen,
+  div.overflow-hidden,
+  div.overflow-y-auto {
+    height: auto !important;
+    overflow: visible !important;
+    position: static !important;
   }
   #printBlock {
     margin: 0 auto !important;
@@ -15,6 +31,8 @@
     border: none !important;
     max-width: 100% !important;
     width: 100% !important;
+    position: static !important;
+    overflow: visible !important;
   }
   @page {
     margin: 6mm;

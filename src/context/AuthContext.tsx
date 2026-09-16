@@ -218,10 +218,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (cached) {
           try {
             const parsed = JSON.parse(cached);
-            if (parsed && !parsed.uid.startsWith('firebase-')) {
+            // Only preserve non-Firebase offline sessions (staff accounts or quick seller profiles)
+            if (
+              parsed &&
+              (parsed.staffCode ||
+                parsed.uid?.startsWith('staff-') ||
+                parsed.uid?.startsWith('quick-'))
+            ) {
               setUserProfile(parsed);
             } else {
               setUserProfile(null);
+              localStorage.removeItem(LOCAL_SELLER_KEY);
             }
           } catch {
             setUserProfile(null);

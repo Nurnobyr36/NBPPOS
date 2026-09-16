@@ -85,14 +85,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div
           id="sidebar-mobile-backdrop"
           onClick={onCloseMobile}
-          className="fixed inset-0 z-40 bg-slate-950/60 backdrop-blur-xs lg:hidden transition-opacity"
+          className="no-print fixed inset-0 z-40 bg-slate-950/60 backdrop-blur-xs lg:hidden transition-opacity"
         />
       )}
 
       {/* Sidebar Container */}
       <aside
         id="app-sidebar"
-        className={`fixed lg:static top-0 bottom-0 left-0 z-50 w-64 h-full shrink-0 bg-emerald-950 text-emerald-50 flex flex-col border-r border-emerald-900/70 shadow-xl lg:shadow-none transition-transform duration-300 ease-in-out lg:translate-x-0 ${
+        className={`no-print fixed lg:static top-0 bottom-0 left-0 z-50 w-64 h-full shrink-0 bg-emerald-950 text-emerald-50 flex flex-col border-r border-emerald-900/70 shadow-xl lg:shadow-none transition-transform duration-300 ease-in-out lg:translate-x-0 ${
           isOpenMobile ? 'translate-x-0' : '-translate-x-full'
         }`}
       >

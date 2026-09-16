@@ -4,6 +4,7 @@ import { jsPDF } from 'jspdf';
 // Options to ignore cross-origin Google Fonts stylesheets that trigger CORS "Cannot access rules" security errors
 const htmlToImageOptions = {
   skipFonts: true,
+  cacheBust: true,
   filter: (domNode: HTMLElement) => {
     // Exclude anything explicitly marked with no-print or script tags
     if (domNode.classList && domNode.classList.contains('no-print')) {
@@ -69,11 +70,10 @@ export async function downloadInvoiceJpg(
   document.body.removeChild(link);
 }
 
-export async function downloadInvoicePdf(
+export async function generateInvoicePdfBlob(
   elementId: string,
-  fileName: string,
   format: 'digital' | 'thermal-80' | 'thermal-58' | 'corporate-a4'
-): Promise<Blob> {
+): Promise<{ blob: Blob; pdf: jsPDF }> {
   const node = document.getElementById(elementId);
   if (!node) throw new Error('Invoice element not found');
 
@@ -105,10 +105,19 @@ export async function downloadInvoicePdf(
     pdf.addImage(dataUrl, 'JPEG', 0, 0, width, height);
   }
 
+  const blob = pdf.output('blob');
+  return { blob, pdf };
+}
+
+export async function downloadInvoicePdf(
+  elementId: string,
+  fileName: string,
+  format: 'digital' | 'thermal-80' | 'thermal-58' | 'corporate-a4'
+): Promise<Blob> {
+  const { blob, pdf } = await generateInvoicePdfBlob(elementId, format);
   const cleanFileName = fileName.endsWith('.pdf') ? fileName : `${fileName}.pdf`;
   pdf.save(cleanFileName);
-
-  return pdf.output('blob');
+  return blob;
 }
 
 export async function shareInvoiceFile(
@@ -147,8 +156,8 @@ export async function shareInvoiceFile(
     await downloadInvoiceJpg(elementId, fileName);
     return 'downloaded';
   } else {
-    // PDF sharing
-    const pdfBlob = await downloadInvoicePdf(elementId, fileName, format);
+    // PDF sharing: generate blob without forcing immediate browser download
+    const { blob: pdfBlob, pdf } = await generateInvoicePdfBlob(elementId, format);
     const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
 
     if (
@@ -170,6 +179,9 @@ export async function shareInvoiceFile(
       }
     }
 
+    // Fallback: download PDF only if sharing was not executed
+    const cleanFileName = fileName.endsWith('.pdf') ? fileName : `${fileName}.pdf`;
+    pdf.save(cleanFileName);
     return 'downloaded';
   }
 }

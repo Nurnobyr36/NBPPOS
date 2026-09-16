@@ -239,7 +239,7 @@ export const PosView: React.FC<PosViewProps> = ({
       (sum, it) => sum + (it.purchasePrice || 0) * it.qty,
       0
     );
-    const profit = Math.max(0, grandTotal - totalCost);
+    const profit = Math.round(grandTotal - totalCost);
 
     const effectiveSellerName = sellerName || 'ক্যাশিয়ার';
     const effectiveSellerId = currentUser?.uid || userProfile?.uid || undefined;
