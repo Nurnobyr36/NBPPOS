@@ -17,6 +17,10 @@ import {
   Lock,
   LogIn,
   KeyRound,
+  ShoppingCart,
+  PackageSearch,
+  Tag,
+  LayoutGrid,
 } from 'lucide-react';
 import { Product, Customer, Sale, SaleItem, Language } from '../types';
 import { formatMoney, generateInvoiceNo, translations } from '../utils/formatters';
@@ -368,105 +372,180 @@ export const PosView: React.FC<PosViewProps> = ({
           )}
         </div>
 
-        {/* Category Filter Chips */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-3 scrollbar-none shrink-0">
-          <button
-            type="button"
-            onClick={() => setSelectedCategory('all')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-              selectedCategory === 'all'
-                ? 'bg-emerald-700 text-white shadow-xs'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-            }`}
-          >
-            সব ({products.length})
-          </button>
-          {categories.map((cat) => (
+        {/* Category Filter Chips & Count Toolbar */}
+        <div className="flex items-center justify-between gap-2 pb-2 mb-2 border-b border-slate-100 dark:border-slate-800/80 shrink-0">
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5">
             <button
-              key={cat}
               type="button"
-              onClick={() => setSelectedCategory(cat)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-                selectedCategory === cat
-                  ? 'bg-emerald-700 text-white shadow-xs'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+              onClick={() => setSelectedCategory('all')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer ${
+                selectedCategory === 'all'
+                  ? 'bg-emerald-700 text-white shadow-xs font-bold'
+                  : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
               }`}
             >
-              {cat}
+              সব পণ্য ({products.length})
             </button>
-          ))}
+            {categories.map((cat) => {
+              const countInCat = products.filter((p) => p.categoryName === cat).length;
+              return (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer ${
+                    selectedCategory === cat
+                      ? 'bg-emerald-700 text-white shadow-xs font-bold'
+                      : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  {cat} ({countInCat})
+                </button>
+              );
+            })}
+          </div>
+          <span className="hidden sm:inline-block text-[11px] text-slate-400 font-medium shrink-0">
+            {filteredProducts.length} টি পণ্য
+          </span>
         </div>
 
         {/* Product Grid */}
-        <div className="flex-1 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3 p-1">
-          {filteredProducts.map((p) => {
-            const isOutOfStock = (p.currentStock || 0) <= 0;
-            return (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => !isOutOfStock && addToCart(p)}
-                disabled={isOutOfStock}
-                className={`group flex flex-col text-left p-2.5 rounded-xl border transition-all duration-150 relative ${
-                  isOutOfStock
-                    ? 'opacity-50 cursor-not-allowed bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800'
-                    : 'bg-white dark:bg-slate-800/80 border-slate-200 dark:border-slate-700/80 hover:border-emerald-500 hover:shadow-md cursor-pointer'
-                }`}
-              >
-                {/* Product Image */}
-                <div className="w-full aspect-square rounded-lg bg-slate-100 dark:bg-slate-700/60 overflow-hidden mb-2 relative flex items-center justify-center">
-                  {p.imageUrl ? (
-                    <img
-                      src={p.imageUrl}
-                      alt={p.name}
-                      referrerPolicy="no-referrer"
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src =
-                          'https://placehold.co/200x200?text=No+Img';
-                      }}
-                    />
-                  ) : (
-                    <Package className="w-8 h-8 text-slate-400" />
-                  )}
-                  {isOutOfStock && (
-                    <div className="absolute inset-0 bg-slate-900/70 flex items-center justify-center p-1">
-                      <span className="text-[10px] font-bold text-white bg-rose-600 px-2 py-0.5 rounded">
-                        স্টক নেই
-                      </span>
-                    </div>
-                  )}
-                </div>
+        {filteredProducts.length === 0 ? (
+          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center my-auto">
+            <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 mb-3 shadow-2xs">
+              <PackageSearch className="w-7 h-7" />
+            </div>
+            <h4 className="text-sm font-bold text-slate-700 dark:text-slate-200 mb-1">
+              কোনো পণ্য পাওয়া যায়নি
+            </h4>
+            <p className="text-xs text-slate-400 max-w-xs mb-3.5">
+              অনুগ্রহ করে ভিন্ন নাম বা বারকোড দিয়ে খুঁজুন অথবা ক্যাটাগরি পরিবর্তন করুন।
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setSearchTerm('');
+                setSelectedCategory('all');
+              }}
+              className="px-3.5 py-1.5 text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 rounded-xl transition-colors cursor-pointer"
+            >
+              ফিল্টার রিসেট করুন
+            </button>
+          </div>
+        ) : (
+          <div className="flex-1 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-3.5 p-1">
+            {filteredProducts.map((p) => {
+              const isOutOfStock = (p.currentStock || 0) <= 0;
+              const isLowStock = !isOutOfStock && (p.currentStock || 0) <= (p.minStock || 5);
+              const cartItem = cart.find((c) => c.productId === p.id);
+              const inCartQty = cartItem ? cartItem.qty : 0;
 
-                {/* Details */}
-                <h4 className="font-bold text-xs text-slate-800 dark:text-slate-100 line-clamp-2 leading-tight min-h-[2rem]">
-                  {p.name}
-                </h4>
-                <div className="mt-auto pt-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-emerald-700 dark:text-emerald-400 tabular-nums">
-                      {formatMoney(p.salePrice, currencySymbol)}
-                    </span>
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => !isOutOfStock && addToCart(p)}
+                  disabled={isOutOfStock}
+                  className={`group relative flex flex-col text-left p-3 rounded-2xl border transition-all duration-200 ${
+                    isOutOfStock
+                      ? 'opacity-55 cursor-not-allowed bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800'
+                      : inCartQty > 0
+                      ? 'bg-emerald-50/20 dark:bg-emerald-950/10 border-emerald-400 dark:border-emerald-600/60 shadow-xs hover:shadow-md cursor-pointer active:scale-[0.98]'
+                      : 'bg-white dark:bg-slate-800/90 border-slate-200/90 dark:border-slate-700/80 hover:border-emerald-500/80 hover:shadow-md dark:hover:shadow-emerald-950/20 cursor-pointer active:scale-[0.98]'
+                  }`}
+                >
+                  {/* Image Container with Floating Badges */}
+                  <div className="w-full aspect-[4/3] rounded-xl bg-slate-100 dark:bg-slate-700/60 overflow-hidden mb-2.5 relative flex items-center justify-center">
+                    {p.imageUrl ? (
+                      <img
+                        src={p.imageUrl}
+                        alt={p.name}
+                        referrerPolicy="no-referrer"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src =
+                            'https://placehold.co/240x180?text=No+Img';
+                        }}
+                      />
+                    ) : (
+                      <Package className="w-9 h-9 text-slate-300 dark:text-slate-600" />
+                    )}
+
+                    {/* Category pill on top-left */}
+                    {p.categoryName && (
+                      <span className="absolute top-2 left-2 max-w-[90px] truncate text-[10px] font-medium bg-slate-900/70 backdrop-blur-xs text-white px-2 py-0.5 rounded-md shadow-xs">
+                        {p.categoryName}
+                      </span>
+                    )}
+
+                    {/* Cart badge or Out of stock badge on top-right */}
+                    {inCartQty > 0 ? (
+                      <span className="absolute top-2 right-2 bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md flex items-center gap-1 ring-2 ring-white dark:ring-slate-800 animate-in zoom-in-75 duration-150">
+                        <CheckCircle2 className="w-3 h-3" />
+                        {inCartQty}টি কার্টে
+                      </span>
+                    ) : isOutOfStock ? (
+                      <div className="absolute inset-0 bg-slate-900/75 backdrop-blur-[1px] flex items-center justify-center p-1">
+                        <span className="text-[11px] font-bold text-white bg-rose-600 px-2.5 py-1 rounded-full shadow-sm">
+                          স্টক শেষ
+                        </span>
+                      </div>
+                    ) : isLowStock ? (
+                      <span className="absolute top-2 right-2 bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-xs">
+                        কম স্টক
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {/* Product Details */}
+                  <h4 className="font-bold text-xs sm:text-[13px] text-slate-800 dark:text-slate-100 line-clamp-2 leading-snug group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors min-h-[2.2rem]">
+                    {p.name}
+                  </h4>
+
+                  {/* SKU & Stock Row */}
+                  <div className="flex items-center justify-between text-[11px] mt-1 text-slate-400">
+                    <span className="font-mono text-[10px] truncate max-w-[90px]">{p.sku}</span>
                     <span
-                      className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
-                        p.currentStock <= p.minStock
-                          ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300'
-                          : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
+                      className={`font-semibold tabular-nums ${
+                        isLowStock
+                          ? 'text-amber-600 dark:text-amber-400'
+                          : 'text-slate-500 dark:text-slate-400'
                       }`}
                     >
-                      {p.currentStock} {p.unitName}
+                      মজুদ: {p.currentStock || 0} {p.unitName}
                     </span>
                   </div>
-                  {canViewBuyPrice && p.purchasePrice !== undefined && (
-                    <div className="text-[10px] text-amber-700/80 dark:text-amber-400/80 font-medium mt-0.5 text-left">
-                      কেনা: {formatMoney(p.purchasePrice, currencySymbol)}
+
+                  {/* Bottom: Price & Quick Add Button */}
+                  <div className="mt-auto pt-2.5 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
+                    <div>
+                      <span className="text-sm sm:text-base font-black text-emerald-700 dark:text-emerald-400 tabular-nums">
+                        {formatMoney(p.salePrice, currencySymbol)}
+                      </span>
+                      {canViewBuyPrice && p.purchasePrice !== undefined && (
+                        <div className="text-[10px] text-amber-700/90 dark:text-amber-400/90 font-medium">
+                          কেনা: {formatMoney(p.purchasePrice, currencySymbol)}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              </button>
-            );
-          })}
-        </div>
+
+                    <div
+                      className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center transition-all duration-150 shadow-2xs ${
+                        isOutOfStock
+                          ? 'bg-slate-100 text-slate-300 dark:bg-slate-800 dark:text-slate-600'
+                          : inCartQty > 0
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 group-hover:bg-emerald-600 group-hover:text-white'
+                      }`}
+                    >
+                      <Plus className="w-4 h-4" />
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* RIGHT: Live POS Cart & Checkout Panel */}

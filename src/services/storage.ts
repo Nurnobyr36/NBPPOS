@@ -32,6 +32,48 @@ const STORAGE_KEYS = {
   THEME: 'ssp_theme_v1',
 };
 
+const DELETED_KEYS_PREFIX = 'ssp_deleted_ids_';
+
+export function markDeletedId(collectionName: string, id: string): void {
+  try {
+    const key = DELETED_KEYS_PREFIX + collectionName;
+    const raw = localStorage.getItem(key);
+    const list: string[] = raw ? JSON.parse(raw) : [];
+    if (!list.includes(id)) {
+      list.push(id);
+      if (list.length > 300) list.shift();
+      localStorage.setItem(key, JSON.stringify(list));
+    }
+  } catch (e) {
+    console.warn('markDeletedId error:', e);
+  }
+}
+
+export function unmarkDeletedId(collectionName: string, id: string): void {
+  try {
+    const key = DELETED_KEYS_PREFIX + collectionName;
+    const raw = localStorage.getItem(key);
+    if (!raw) return;
+    const list: string[] = JSON.parse(raw);
+    const filtered = list.filter((item) => item !== id);
+    localStorage.setItem(key, JSON.stringify(filtered));
+  } catch (e) {
+    console.warn('unmarkDeletedId error:', e);
+  }
+}
+
+export function isDeletedId(collectionName: string, id: string): boolean {
+  try {
+    const key = DELETED_KEYS_PREFIX + collectionName;
+    const raw = localStorage.getItem(key);
+    if (!raw) return false;
+    const list: string[] = JSON.parse(raw);
+    return list.includes(id);
+  } catch {
+    return false;
+  }
+}
+
 function safeGet<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(key);
@@ -71,6 +113,7 @@ export function addProduct(product: Omit<Product, 'id' | 'createdAt' | 'updatedA
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
+  unmarkDeletedId('products', newProduct.id);
   products.unshift(newProduct);
   saveProducts(products);
 
@@ -111,6 +154,7 @@ export function updateProduct(id: string, updates: Partial<Product>): Product | 
 }
 
 export function deleteProduct(id: string): boolean {
+  markDeletedId('products', id);
   const products = getProducts();
   const filtered = products.filter((p) => p.id !== id);
   saveProducts(filtered);
@@ -206,6 +250,7 @@ export function createSale(saleData: Omit<Sale, 'id' | 'createdAt'>): Sale {
 }
 
 export function deleteSale(saleId: string, restoreStock: boolean = true): boolean {
+  markDeletedId('sales', saleId);
   const sales = getSales();
   const targetSale = sales.find((s) => s.id === saleId);
   if (!targetSale) return false;
@@ -530,17 +575,13 @@ export function clearAllData(): void {
 }
 
 export function purgeMockData(): void {
+  // Manual purge helper if requested from Settings
   try {
-    const isPurged = localStorage.getItem('smartshop_mock_purged_v2');
-    if (!isPurged) {
-      clearAllData();
-      localStorage.setItem('smartshop_mock_purged_v2', 'true');
-    }
+    clearAllData();
   } catch (e) {
     console.warn('purgeMockData error:', e);
   }
 }
 
-// Auto-run purge once to guarantee mock data is deleted
-purgeMockData();
+// Do not auto-purge on module load so user's saved entries remain intact
 

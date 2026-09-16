@@ -122,6 +122,23 @@
         "updatedAt": { "type": "string" }
       },
       "required": ["shopName"]
+    },
+    "StaffAccount": {
+      "title": "StaffAccount",
+      "description": "Cashier and staff PIN account",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "staffCode": { "type": "string" },
+        "name": { "type": "string" },
+        "pin": { "type": "string" },
+        "role": { "type": "string" },
+        "phone": { "type": "string" },
+        "status": { "type": "string" },
+        "createdByEmail": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "staffCode", "name", "pin"]
     }
   },
   "firestore": {
@@ -156,6 +173,10 @@
     "/users/{userId}": {
       "schema": "User",
       "description": "User profiles and sellers"
+    },
+    "/staff_accounts/{staffId}": {
+      "schema": "StaffAccount",
+      "description": "Staff cashier credentials"
     }
   }
 }

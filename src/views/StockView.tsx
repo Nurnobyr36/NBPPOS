@@ -13,10 +13,15 @@ import {
   Wallet,
   Coins,
   Package,
+  Edit2,
+  PlusCircle,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react';
 import { Product, StockMovement, Language } from '../types';
 import { formatDate, formatMoney, translations } from '../utils/formatters';
-import { adjustProductStock } from '../services/storage';
+import { adjustProductStock, updateProduct } from '../services/storage';
+import { syncProductToFirestore } from '../services/firebase';
 import { useAuth } from '../context/AuthContext';
 
 interface StockViewProps {
@@ -48,6 +53,37 @@ export const StockView: React.FC<StockViewProps> = ({
   const [qtyChangeInput, setQtyChangeInput] = useState<string>('');
   const [reasonInput, setReasonInput] = useState<string>('');
   const [modalError, setModalError] = useState<string | null>(null);
+
+  // Quick Buy Price (কেনা দাম) Modal state
+  const [editingBuyPriceProduct, setEditingBuyPriceProduct] = useState<Product | null>(null);
+  const [buyPriceInput, setBuyPriceInput] = useState<string>('');
+  const [isSavingBuyPrice, setIsSavingBuyPrice] = useState(false);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const openBuyPriceModal = (product: Product) => {
+    setEditingBuyPriceProduct(product);
+    setBuyPriceInput(product.purchasePrice ? String(product.purchasePrice) : '');
+  };
+
+  const handleSaveBuyPrice = async () => {
+    if (!editingBuyPriceProduct) return;
+    const priceNum = Math.max(0, Number(buyPriceInput) || 0);
+    setIsSavingBuyPrice(true);
+    try {
+      const updated = updateProduct(editingBuyPriceProduct.id, { purchasePrice: priceNum });
+      if (updated) {
+        await syncProductToFirestore(updated).catch(() => {});
+      }
+      onRefreshData?.();
+      setEditingBuyPriceProduct(null);
+      setToastMsg(`"${editingBuyPriceProduct.name}" এর কেনা দাম ৳${priceNum} সফলভাবে সংরক্ষিত হয়েছে!`);
+      setTimeout(() => setToastMsg(null), 3500);
+    } catch (err) {
+      console.warn('Error saving buy price in StockView:', err);
+    } finally {
+      setIsSavingBuyPrice(false);
+    }
+  };
 
   // Admin inventory valuation calculations
   const totalStockPurchaseValue = useMemo(() => {
@@ -279,7 +315,27 @@ export const StockView: React.FC<StockViewProps> = ({
                       </td>
                       {canViewBuyPrice && (
                         <td className="py-2.5 px-3 font-semibold text-amber-700 dark:text-amber-400 tabular-nums">
-                          {formatMoney(pCost, currencySymbol)}
+                          {pCost > 0 ? (
+                            <button
+                              type="button"
+                              onClick={() => openBuyPriceModal(p)}
+                              className="group inline-flex items-center gap-1.5 hover:text-amber-600 dark:hover:text-amber-300 transition-colors text-left cursor-pointer"
+                              title="কেনা দাম পরিবর্তন করুন"
+                            >
+                              <span>{formatMoney(pCost, currencySymbol)}</span>
+                              <Edit2 className="w-3 h-3 text-slate-400 opacity-40 group-hover:opacity-100 group-hover:text-amber-600 transition-opacity" />
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => openBuyPriceModal(p)}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-100 hover:bg-amber-200 text-amber-900 dark:bg-amber-950/80 dark:hover:bg-amber-900 dark:text-amber-300 font-bold text-[10px] transition-colors cursor-pointer"
+                              title="এই পণ্যের কেনা দাম এড করুন"
+                            >
+                              <PlusCircle className="w-3 h-3 text-amber-600" />
+                              + কেনা দাম
+                            </button>
+                          )}
                         </td>
                       )}
                       <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-slate-100 tabular-nums">
@@ -470,6 +526,102 @@ export const StockView: React.FC<StockViewProps> = ({
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Quick Buy Price (কেনা দাম) Modal */}
+      {editingBuyPriceProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-md p-5 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400">
+                  <DollarSign className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                    কেনা দাম এড / পরিবর্তন করুন
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[260px]">
+                    {editingBuyPriceProduct.name} ({editingBuyPriceProduct.sku})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingBuyPriceProduct(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg transition-colors cursor-pointer"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-slate-50 dark:bg-slate-800/60 rounded-xl p-3 flex items-center justify-between text-xs">
+              <span className="text-slate-500 dark:text-slate-400">বর্তমান বিক্রয় মূল্য:</span>
+              <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                {formatMoney(editingBuyPriceProduct.salePrice, currencySymbol)}
+              </span>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-amber-700 dark:text-amber-400 mb-1.5 flex items-center justify-between">
+                <span>নতুন কেনা দাম / ক্রয় মূল্য ({currencySymbol}) *</span>
+                <span className="text-[10px] text-amber-600 dark:text-amber-400 font-normal">আইটেম ক্রয়ের রেট</span>
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                autoFocus
+                value={buyPriceInput}
+                onChange={(e) => setBuyPriceInput(e.target.value)}
+                placeholder="যেমন: ৫০"
+                className="w-full text-base font-bold text-amber-800 dark:text-amber-300 px-3.5 py-2.5 bg-amber-50/40 dark:bg-amber-950/20 border border-amber-300 dark:border-amber-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 tabular-nums"
+              />
+            </div>
+
+            {/* Profit Margin Preview */}
+            {Number(buyPriceInput) > 0 && (
+              <div className="p-3 bg-amber-50/50 dark:bg-amber-950/30 rounded-xl border border-amber-200 dark:border-amber-900/50 text-xs flex items-center justify-between">
+                <span className="text-slate-600 dark:text-slate-300">প্রতি ইউনিটে সম্ভাব্য লাভ:</span>
+                <div className="text-right font-bold">
+                  <span className={editingBuyPriceProduct.salePrice >= Number(buyPriceInput) ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600'}>
+                    +{formatMoney(editingBuyPriceProduct.salePrice - Number(buyPriceInput), currencySymbol)}
+                  </span>
+                  <span className="ml-1 text-[11px] text-slate-500 font-normal">
+                    ({Math.round(((editingBuyPriceProduct.salePrice - Number(buyPriceInput)) / Number(buyPriceInput)) * 100)}% মার্জিন)
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setEditingBuyPriceProduct(null)}
+                className="flex-1 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
+              >
+                বাতিল
+              </button>
+              <button
+                type="button"
+                disabled={isSavingBuyPrice}
+                onClick={handleSaveBuyPrice}
+                className="flex-1 py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 rounded-xl shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                {isSavingBuyPrice ? 'সংরক্ষণ হচ্ছে...' : 'কেনা দাম সংরক্ষণ'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Notification Toast */}
+      {toastMsg && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white dark:bg-emerald-950 dark:text-emerald-100 border border-emerald-500/30 px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 text-xs font-semibold animate-in fade-in slide-in-from-bottom-3 duration-200">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{toastMsg}</span>
         </div>
       )}
     </div>

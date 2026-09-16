@@ -14,6 +14,7 @@ import {
   saveCustomers,
   saveSuppliers,
   saveShopSettings,
+  isDeletedId,
 } from './services/storage';
 import {
   testConnection,
@@ -29,6 +30,7 @@ import {
   syncSupplierToFirestore,
   syncSaleToFirestore,
   syncPurchaseToFirestore,
+  syncStockMovementToFirestore,
   syncShopSettingsToFirestore,
   isLegacyMockId,
   purgeLegacyMockDataFromFirestore,
@@ -121,17 +123,30 @@ export function App() {
       console.warn('purgeLegacyMockDataFromFirestore notice:', err)
     );
 
-    // Real-time synchronization listeners (excluding any legacy mock objects)
+    // Real-time synchronization listeners with bidirectional persistence
     const unsubProducts = subscribeToProducts(
       (cloudProds) => {
-        const cleanProds = (cloudProds || []).filter((p) => !isLegacyMockId(p.id));
-        if (cleanProds.length > 0 || (cloudProds && cloudProds.length > 0)) {
-          setProducts(cleanProds);
-          saveProducts(cleanProds);
-        } else {
-          const locals = (getProducts() || []).filter((p) => !isLegacyMockId(p.id));
-          setProducts(locals);
-        }
+        const cleanCloud = (cloudProds || []).filter((p) => !isLegacyMockId(p.id));
+        const localProds = (getProducts() || []).filter((p) => !isLegacyMockId(p.id));
+
+        const map = new Map<string, Product>();
+        // 1. Primary source: confirmed items from cloud Firestore
+        cleanCloud.forEach((p) => map.set(p.id, p));
+
+        // 2. Preserve any user-created local item not yet in cloud, and upload it
+        localProds.forEach((local) => {
+          if (!map.has(local.id) && !isDeletedId('products', local.id)) {
+            map.set(local.id, local);
+            syncProductToFirestore(local).catch((e) =>
+              console.warn('Auto-sync product to Firestore notice:', e)
+            );
+          }
+        });
+
+        const merged = Array.from(map.values());
+        merged.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+        setProducts(merged);
+        saveProducts(merged);
         setCloudStatus('connected');
       },
       () => setCloudStatus('offline')
@@ -139,64 +154,121 @@ export function App() {
 
     const unsubSales = subscribeToSales(
       (cloudSales) => {
-        const cleanSales = (cloudSales || []).filter((s) => !isLegacyMockId(s.id));
-        if (cleanSales.length > 0 || (cloudSales && cloudSales.length > 0)) {
-          setSales(cleanSales);
-          saveSales(cleanSales);
-        } else {
-          const locals = (getSales() || []).filter((s) => !isLegacyMockId(s.id));
-          setSales(locals);
-        }
+        const cleanCloud = (cloudSales || []).filter((s) => !isLegacyMockId(s.id));
+        const localSales = (getSales() || []).filter((s) => !isLegacyMockId(s.id));
+
+        const map = new Map<string, Sale>();
+        cleanCloud.forEach((s) => map.set(s.id, s));
+
+        localSales.forEach((local) => {
+          if (!map.has(local.id) && !isDeletedId('sales', local.id)) {
+            map.set(local.id, local);
+            syncSaleToFirestore(local).catch((e) =>
+              console.warn('Auto-sync sale to Firestore notice:', e)
+            );
+          }
+        });
+
+        const merged = Array.from(map.values());
+        merged.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+        setSales(merged);
+        saveSales(merged);
       },
       () => setCloudStatus('offline')
     );
 
     const unsubPurchases = subscribeToPurchases(
       (cloudPurchases) => {
-        const cleanPurchases = (cloudPurchases || []).filter((p) => !isLegacyMockId(p.id));
-        if (cleanPurchases.length > 0 || (cloudPurchases && cloudPurchases.length > 0)) {
-          setPurchases(cleanPurchases);
-          savePurchases(cleanPurchases);
-        } else {
-          const locals = (getPurchases() || []).filter((p) => !isLegacyMockId(p.id));
-          setPurchases(locals);
-        }
+        const cleanCloud = (cloudPurchases || []).filter((p) => !isLegacyMockId(p.id));
+        const localPurchases = (getPurchases() || []).filter((p) => !isLegacyMockId(p.id));
+
+        const map = new Map<string, Purchase>();
+        cleanCloud.forEach((p) => map.set(p.id, p));
+
+        localPurchases.forEach((local) => {
+          if (!map.has(local.id) && !isDeletedId('purchases', local.id)) {
+            map.set(local.id, local);
+            syncPurchaseToFirestore(local).catch((e) =>
+              console.warn('Auto-sync purchase to Firestore notice:', e)
+            );
+          }
+        });
+
+        const merged = Array.from(map.values());
+        merged.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+        setPurchases(merged);
+        savePurchases(merged);
       },
       () => setCloudStatus('offline')
     );
 
     const unsubCustomers = subscribeToCustomers(
       (cloudCusts) => {
-        const cleanCusts = (cloudCusts || []).filter((c) => !isLegacyMockId(c.id));
-        if (cleanCusts.length > 0 || (cloudCusts && cloudCusts.length > 0)) {
-          setCustomers(cleanCusts);
-          saveCustomers(cleanCusts);
-        } else {
-          const locals = (getCustomers() || []).filter((c) => !isLegacyMockId(c.id));
-          setCustomers(locals);
-        }
+        const cleanCloud = (cloudCusts || []).filter((c) => !isLegacyMockId(c.id));
+        const localCusts = (getCustomers() || []).filter((c) => !isLegacyMockId(c.id));
+
+        const map = new Map<string, Customer>();
+        cleanCloud.forEach((c) => map.set(c.id, c));
+
+        localCusts.forEach((local) => {
+          if (!map.has(local.id) && !isDeletedId('customers', local.id)) {
+            map.set(local.id, local);
+            syncCustomerToFirestore(local).catch((e) =>
+              console.warn('Auto-sync customer to Firestore notice:', e)
+            );
+          }
+        });
+
+        const merged = Array.from(map.values());
+        merged.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+        setCustomers(merged);
+        saveCustomers(merged);
       },
       () => setCloudStatus('offline')
     );
 
     const unsubSuppliers = subscribeToSuppliers(
       (cloudSups) => {
-        const cleanSups = (cloudSups || []).filter((s) => !isLegacyMockId(s.id));
-        if (cleanSups.length > 0 || (cloudSups && cloudSups.length > 0)) {
-          setSuppliers(cleanSups);
-          saveSuppliers(cleanSups);
-        } else {
-          const locals = (getSuppliers() || []).filter((s) => !isLegacyMockId(s.id));
-          setSuppliers(locals);
-        }
+        const cleanCloud = (cloudSups || []).filter((s) => !isLegacyMockId(s.id));
+        const localSups = (getSuppliers() || []).filter((s) => !isLegacyMockId(s.id));
+
+        const map = new Map<string, Supplier>();
+        cleanCloud.forEach((s) => map.set(s.id, s));
+
+        localSups.forEach((local) => {
+          if (!map.has(local.id) && !isDeletedId('suppliers', local.id)) {
+            map.set(local.id, local);
+            syncSupplierToFirestore(local).catch((e) =>
+              console.warn('Auto-sync supplier to Firestore notice:', e)
+            );
+          }
+        });
+
+        const merged = Array.from(map.values());
+        merged.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+        setSuppliers(merged);
+        saveSuppliers(merged);
       },
       () => setCloudStatus('offline')
     );
 
     const unsubMovements = subscribeToStockMovements(
       (cloudMovs) => {
-        const cleanMovs = (cloudMovs || []).filter((m) => !isLegacyMockId(m.id));
-        setStockMovements(cleanMovs);
+        const cleanCloud = (cloudMovs || []).filter((m) => !isLegacyMockId(m.id));
+        const localMovs = (getStockMovements() || []).filter((m) => !isLegacyMockId(m.id));
+
+        const map = new Map<string, any>();
+        cleanCloud.forEach((m) => map.set(m.id, m));
+        localMovs.forEach((local) => {
+          if (!map.has(local.id)) {
+            map.set(local.id, local);
+            syncStockMovementToFirestore(local).catch(() => {});
+          }
+        });
+
+        const merged = Array.from(map.values());
+        merged.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+        setStockMovements(merged);
       },
       () => setCloudStatus('offline')
     );
@@ -208,7 +280,7 @@ export function App() {
           saveShopSettings(cloudSettings);
         } else {
           const locals = getShopSettings();
-          if (locals) {
+          if (locals && locals.shopName) {
             syncShopSettingsToFirestore(locals).catch(() => {});
           }
         }
@@ -459,6 +531,7 @@ export function App() {
           {activeTab === 'invoice-view' && activeInvoice && (
             <InvoiceView
               sale={activeInvoice}
+              products={products}
               shopSettings={shopSettings}
               currencySymbol={currencySymbol}
               lang={lang}

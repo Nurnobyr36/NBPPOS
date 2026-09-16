@@ -26,10 +26,15 @@ import {
   X,
   ExternalLink,
 } from 'lucide-react';
-import { Sale, ShopSettings, Language } from '../types';
+import { Sale, ShopSettings, Language, Product } from '../types';
 import { formatMoney, formatDate } from '../utils/formatters';
 import { BarcodeSvg } from '../components/BarcodeSvg';
 import { InvoiceQrCode } from '../components/InvoiceQrCode';
+import {
+  InvoiceProductWatermark,
+  WatermarkStyle,
+  WatermarkOpacity,
+} from '../components/InvoiceProductWatermark';
 import {
   downloadInvoiceJpg,
   downloadInvoicePdf,
@@ -38,6 +43,7 @@ import {
 
 interface InvoiceViewProps {
   sale: Sale;
+  products?: Product[];
   shopSettings: ShopSettings;
   currencySymbol: string;
   lang: Language;
@@ -48,6 +54,7 @@ type InvoiceFormat = 'digital' | 'thermal-80' | 'thermal-58' | 'corporate-a4';
 
 export const InvoiceView: React.FC<InvoiceViewProps> = ({
   sale,
+  products = [],
   shopSettings,
   currencySymbol,
   lang: _lang,
@@ -58,6 +65,12 @@ export const InvoiceView: React.FC<InvoiceViewProps> = ({
   const [exporting, setExporting] = useState<'jpg' | 'pdf' | 'share' | null>(null);
   const [exportStatus, setExportStatus] = useState<string | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
+
+  // Watermark state (Large sold product watermark)
+  const [watermarkEnabled, setWatermarkEnabled] = useState(true);
+  const [watermarkStyle, setWatermarkStyle] = useState<WatermarkStyle>('both');
+  const [watermarkOpacity, setWatermarkOpacity] = useState<WatermarkOpacity>('medium');
+  const [selectedWatermarkItem, setSelectedWatermarkItem] = useState<string>('all');
 
   // Total discounts calculation
   const itemDiscountsTotal = (sale.items || []).reduce(
@@ -479,6 +492,129 @@ _${shopSettings.invoiceFooter || 'আমাদের সাথে থাকা�
         </div>
       )}
 
+      {/* Watermark Quick Controls Bar (Visible on screen, hidden during print) */}
+      <div className="no-print bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3 sm:p-4 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs">
+        {/* Left: Watermark On/Off toggle & status */}
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => setWatermarkEnabled(!watermarkEnabled)}
+            className={`px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer border ${
+              watermarkEnabled
+                ? 'bg-purple-600 text-white border-purple-600 shadow-2xs'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>বিক্রিত পণ্যের জলছাপ: {watermarkEnabled ? 'চালু' : 'বন্ধ'}</span>
+          </button>
+
+          {watermarkEnabled && (
+            <span className="text-slate-500 dark:text-slate-400 hidden sm:inline font-medium">
+              ইনভয়েসের পেছনে বিক্রিত পণ্যের বড় জলছাপ (Watermark) প্রদর্শিত হচ্ছে
+            </span>
+          )}
+        </div>
+
+        {/* Right: Customization Controls */}
+        {watermarkEnabled && (
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Style: Both / Image / Text */}
+            <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
+              <button
+                type="button"
+                onClick={() => setWatermarkStyle('both')}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                  watermarkStyle === 'both'
+                    ? 'bg-white dark:bg-slate-900 text-purple-600 dark:text-purple-400 shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-400'
+                }`}
+              >
+                ছবি ও নাম
+              </button>
+              <button
+                type="button"
+                onClick={() => setWatermarkStyle('image')}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                  watermarkStyle === 'image'
+                    ? 'bg-white dark:bg-slate-900 text-purple-600 dark:text-purple-400 shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-400'
+                }`}
+              >
+                শুধু ছবি
+              </button>
+              <button
+                type="button"
+                onClick={() => setWatermarkStyle('text')}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                  watermarkStyle === 'text'
+                    ? 'bg-white dark:bg-slate-900 text-purple-600 dark:text-purple-400 shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-400'
+                }`}
+              >
+                শুধু নাম
+              </button>
+            </div>
+
+            {/* Opacity: Light / Medium / Strong */}
+            <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
+              <button
+                type="button"
+                onClick={() => setWatermarkOpacity('light')}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                  watermarkOpacity === 'light'
+                    ? 'bg-white dark:bg-slate-900 text-purple-600 dark:text-purple-400 shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-400'
+                }`}
+                title="হালকা অস্বচ্ছতা (৮%)"
+              >
+                হালকা
+              </button>
+              <button
+                type="button"
+                onClick={() => setWatermarkOpacity('medium')}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                  watermarkOpacity === 'medium'
+                    ? 'bg-white dark:bg-slate-900 text-purple-600 dark:text-purple-400 shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-400'
+                }`}
+                title="মাঝারি অস্বচ্ছতা (১৪%)"
+              >
+                মাঝারি
+              </button>
+              <button
+                type="button"
+                onClick={() => setWatermarkOpacity('strong')}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                  watermarkOpacity === 'strong'
+                    ? 'bg-white dark:bg-slate-900 text-purple-600 dark:text-purple-400 shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-400'
+                }`}
+                title="স্পষ্ট অস্বচ্ছতা (২২%)"
+              >
+                স্পষ্ট
+              </button>
+            </div>
+
+            {/* Item selector for multi-item invoices */}
+            {sale.items && sale.items.length > 1 && (
+              <select
+                value={selectedWatermarkItem}
+                onChange={(e) => setSelectedWatermarkItem(e.target.value)}
+                className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-lg px-2 py-1 text-[11px] font-medium outline-hidden cursor-pointer"
+              >
+                <option value="all">সবগুলো পণ্য ({sale.items.length} টি)</option>
+                {sale.items.map((it, idx) => (
+                  <option key={idx} value={it.productId}>
+                    {idx + 1}. {it.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Main Printable Container */}
       <div className="flex justify-center">
         {/* ============================================================ */}
@@ -489,6 +625,17 @@ _${shopSettings.invoiceFooter || 'আমাদের সাথে থাকা�
             id="printBlock"
             className="w-full max-w-[430px] bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden relative"
           >
+            {/* Product Large Watermark */}
+            <InvoiceProductWatermark
+              sale={sale}
+              products={products}
+              format="digital"
+              enabled={watermarkEnabled}
+              style={watermarkStyle}
+              opacity={watermarkOpacity}
+              selectedItemId={selectedWatermarkItem}
+            />
+
             {/* Top Digital Brand Header */}
             <div className="relative bg-gradient-to-br from-emerald-600 via-teal-700 to-emerald-900 p-6 text-white text-center overflow-hidden">
               {/* Decorative digital circuit aura */}
@@ -809,10 +956,22 @@ _${shopSettings.invoiceFooter || 'আমাদের সাথে থাকা�
         {invoiceFormat === 'thermal-80' && (
           <div
             id="printBlock"
-            className="w-full max-w-[340px] bg-white text-slate-900 border border-slate-300 dark:border-slate-700 rounded-2xl p-6 shadow-md print:border-none print:shadow-none print:p-0 print:m-0 font-sans"
+            className="w-full max-w-[340px] bg-white text-slate-900 border border-slate-300 dark:border-slate-700 rounded-2xl p-6 shadow-md print:border-none print:shadow-none print:p-0 print:m-0 font-sans relative overflow-hidden"
           >
-            {/* Header */}
-            <div className="text-center pb-3 border-b border-dashed border-slate-400">
+            {/* Product Large Watermark */}
+            <InvoiceProductWatermark
+              sale={sale}
+              products={products}
+              format="thermal-80"
+              enabled={watermarkEnabled}
+              style={watermarkStyle}
+              opacity={watermarkOpacity}
+              selectedItemId={selectedWatermarkItem}
+            />
+
+            <div className="relative z-10">
+              {/* Header */}
+              <div className="text-center pb-3 border-b border-dashed border-slate-400">
               {shopSettings.logoUrl && (
                 <img
                   src={shopSettings.logoUrl}
@@ -958,6 +1117,7 @@ _${shopSettings.invoiceFooter || 'আমাদের সাথে থাকা�
                 {shopSettings.invoiceFooter || 'ধন্যবাদ, আবার আসবেন!'}
               </p>
             </div>
+            </div>
           </div>
         )}
 
@@ -967,9 +1127,21 @@ _${shopSettings.invoiceFooter || 'আমাদের সাথে থাকা�
         {invoiceFormat === 'thermal-58' && (
           <div
             id="printBlock"
-            className="w-full max-w-[270px] bg-white text-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl p-4 shadow-sm print:border-none print:shadow-none print:p-0 print:m-0 text-[11px] font-mono"
+            className="w-full max-w-[270px] bg-white text-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl p-4 shadow-sm print:border-none print:shadow-none print:p-0 print:m-0 text-[11px] font-mono relative overflow-hidden"
           >
-            <div className="text-center pb-2 border-b border-dashed border-slate-400">
+            {/* Product Large Watermark */}
+            <InvoiceProductWatermark
+              sale={sale}
+              products={products}
+              format="thermal-58"
+              enabled={watermarkEnabled}
+              style={watermarkStyle}
+              opacity={watermarkOpacity}
+              selectedItemId={selectedWatermarkItem}
+            />
+
+            <div className="relative z-10">
+              <div className="text-center pb-2 border-b border-dashed border-slate-400">
               <h1 className="font-black text-sm uppercase leading-tight">
                 {shopSettings.shopName}
               </h1>
@@ -1017,6 +1189,7 @@ _${shopSettings.invoiceFooter || 'আমাদের সাথে থাকা�
               <InvoiceQrCode data={qrVerificationData} size={65} />
               <p className="text-[10px] mt-1">ধন্যবাদ!</p>
             </div>
+            </div>
           </div>
         )}
 
@@ -1026,10 +1199,22 @@ _${shopSettings.invoiceFooter || 'আমাদের সাথে থাকা�
         {invoiceFormat === 'corporate-a4' && (
           <div
             id="printBlock"
-            className="w-full max-w-[780px] bg-white text-slate-900 border border-slate-300 dark:border-slate-700 rounded-2xl p-8 shadow-lg print:border-none print:shadow-none print:p-0 print:m-0"
+            className="w-full max-w-[780px] bg-white text-slate-900 border border-slate-300 dark:border-slate-700 rounded-2xl p-8 shadow-lg print:border-none print:shadow-none print:p-0 print:m-0 relative overflow-hidden min-h-[900px]"
           >
-            {/* Corporate Header */}
-            <div className="flex items-start justify-between border-b-2 border-slate-800 pb-6">
+            {/* Product Large Watermark */}
+            <InvoiceProductWatermark
+              sale={sale}
+              products={products}
+              format="corporate-a4"
+              enabled={watermarkEnabled}
+              style={watermarkStyle}
+              opacity={watermarkOpacity}
+              selectedItemId={selectedWatermarkItem}
+            />
+
+            <div className="relative z-10">
+              {/* Corporate Header */}
+              <div className="flex items-start justify-between border-b-2 border-slate-800 pb-6">
               <div className="space-y-1.5">
                 {shopSettings.logoUrl && (
                   <img
@@ -1228,6 +1413,7 @@ _${shopSettings.invoiceFooter || 'আমাদের সাথে থাকা�
               <div className="text-center border-t border-slate-400 pt-1.5 w-44">
                 কর্তৃপক্ষের স্বাক্ষর ও সিল
               </div>
+            </div>
             </div>
           </div>
         )}

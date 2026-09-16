@@ -244,9 +244,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [currentUser?.email, userProfile?.email]);
 
   // "শুধু মাত্র এই মেইল গুলা দিয়ে লগিন করলে কিনা দাম দেখা যাবে বাকীগুলা দিয়ে শুধু বিক্রির দাম দেখা যাবে"
+  // Cashier staff PIN accounts only see selling prices. Owner/Admins and designated emails can see and manage buy prices.
   const canViewBuyPrice = useMemo(() => {
-    return isDesignatedActiveAdmin;
-  }, [isDesignatedActiveAdmin]);
+    if (userProfile?.staffCode || (userProfile?.role === 'cashier' && !isDesignatedActiveAdmin)) {
+      return false;
+    }
+    return true;
+  }, [userProfile, isDesignatedActiveAdmin]);
 
   // "আর এগুলা দিয়ে লগিন করলে যাতে স্টাফ আইডি খোলা যায় এমন সিস্টেম করো"
   const canManageStaff = useMemo(() => {

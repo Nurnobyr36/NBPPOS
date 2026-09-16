@@ -23,10 +23,26 @@ export const db = initializeFirestore(
   app,
   {
     experimentalForceLongPolling: true,
+    ignoreUndefinedProperties: true,
   },
   firebaseConfig.firestoreDatabaseId
 );
 export const auth = getAuth(app);
+
+// Helper to remove undefined fields recursively so Firestore setDoc never throws unsupported field value error
+export function sanitizeDocData<T>(obj: T): T {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+  try {
+    return JSON.parse(
+      JSON.stringify(obj, (_, value) => (value === undefined ? null : value))
+    );
+  } catch (err) {
+    console.warn('sanitizeDocData error:', err);
+    return obj;
+  }
+}
 
 export enum OperationType {
   CREATE = 'create',
@@ -235,7 +251,8 @@ export function subscribeToShopSettings(
 // Write/Sync helpers
 export async function syncProductToFirestore(product: Product): Promise<void> {
   try {
-    await setDoc(doc(db, 'products', product.id), product);
+    const clean = sanitizeDocData(product);
+    await setDoc(doc(db, 'products', product.id), clean, { merge: true });
   } catch (err) {
     handleFirestoreError(err, OperationType.WRITE, `products/${product.id}`);
   }
@@ -251,7 +268,8 @@ export async function deleteProductFromFirestore(id: string): Promise<void> {
 
 export async function syncSaleToFirestore(sale: Sale): Promise<void> {
   try {
-    await setDoc(doc(db, 'sales', sale.id), sale);
+    const clean = sanitizeDocData(sale);
+    await setDoc(doc(db, 'sales', sale.id), clean, { merge: true });
   } catch (err) {
     handleFirestoreError(err, OperationType.WRITE, `sales/${sale.id}`);
   }
@@ -267,7 +285,8 @@ export async function deleteSaleFromFirestore(id: string): Promise<void> {
 
 export async function syncPurchaseToFirestore(purchase: Purchase): Promise<void> {
   try {
-    await setDoc(doc(db, 'purchases', purchase.id), purchase);
+    const clean = sanitizeDocData(purchase);
+    await setDoc(doc(db, 'purchases', purchase.id), clean, { merge: true });
   } catch (err) {
     handleFirestoreError(err, OperationType.WRITE, `purchases/${purchase.id}`);
   }
@@ -275,7 +294,8 @@ export async function syncPurchaseToFirestore(purchase: Purchase): Promise<void>
 
 export async function syncCustomerToFirestore(customer: Customer): Promise<void> {
   try {
-    await setDoc(doc(db, 'customers', customer.id), customer);
+    const clean = sanitizeDocData(customer);
+    await setDoc(doc(db, 'customers', customer.id), clean, { merge: true });
   } catch (err) {
     handleFirestoreError(err, OperationType.WRITE, `customers/${customer.id}`);
   }
@@ -283,7 +303,8 @@ export async function syncCustomerToFirestore(customer: Customer): Promise<void>
 
 export async function syncSupplierToFirestore(supplier: Supplier): Promise<void> {
   try {
-    await setDoc(doc(db, 'suppliers', supplier.id), supplier);
+    const clean = sanitizeDocData(supplier);
+    await setDoc(doc(db, 'suppliers', supplier.id), clean, { merge: true });
   } catch (err) {
     handleFirestoreError(err, OperationType.WRITE, `suppliers/${supplier.id}`);
   }
@@ -291,7 +312,8 @@ export async function syncSupplierToFirestore(supplier: Supplier): Promise<void>
 
 export async function syncStockMovementToFirestore(movement: StockMovement): Promise<void> {
   try {
-    await setDoc(doc(db, 'stockMovements', movement.id), movement);
+    const clean = sanitizeDocData(movement);
+    await setDoc(doc(db, 'stockMovements', movement.id), clean, { merge: true });
   } catch (err) {
     handleFirestoreError(err, OperationType.WRITE, `stockMovements/${movement.id}`);
   }
@@ -299,7 +321,8 @@ export async function syncStockMovementToFirestore(movement: StockMovement): Pro
 
 export async function syncShopSettingsToFirestore(settings: ShopSettings): Promise<void> {
   try {
-    await setDoc(doc(db, 'shopSettings', 'default'), settings);
+    const clean = sanitizeDocData(settings);
+    await setDoc(doc(db, 'shopSettings', 'default'), clean, { merge: true });
   } catch (err) {
     handleFirestoreError(err, OperationType.WRITE, 'shopSettings/default');
   }
