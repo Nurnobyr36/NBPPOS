@@ -169,7 +169,7 @@ export function formatDate(dateString?: string, includeTime = false): string {
   return date.toLocaleDateString('bn-BD', options);
 }
 
-export function generateSku(prefix: string = 'PRD'): string {
+export function generateSku(prefix: string = 'NBP'): string {
   const rand = Math.floor(10000 + Math.random() * 90000);
   return `${prefix}-${rand}`;
 }
@@ -189,10 +189,10 @@ export function generateBarcode(): string {
   return result + check;
 }
 
-export function generateInvoiceNo(): string {
+export function generateInvoiceNo(prefix: string = 'NBP'): string {
   const date = new Date();
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const rand = Math.floor(1000 + Math.random() * 9000);
-  return `INV-${year}${month}-${rand}`;
+  return `${prefix}-INV-${year}${month}-${rand}`;
 }

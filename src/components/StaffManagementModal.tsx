@@ -64,7 +64,7 @@ export const StaffManagementModal: React.FC<StaffManagementModalProps> = ({
   const handleAutoGenerateCode = () => {
     const count = staffAccounts.length + 1;
     const pad = count < 10 ? `0${count}` : `${count}`;
-    setStaffCode(`STF-${pad}`);
+    setStaffCode(`NBP-${pad}`);
     if (!pin) {
       // 4 digit random pin
       const randomPin = Math.floor(1000 + Math.random() * 9000).toString();
@@ -99,7 +99,7 @@ export const StaffManagementModal: React.FC<StaffManagementModalProps> = ({
       return;
     }
     if (!staffCode.trim()) {
-      setError('স্টাফ আইডি বা কোড দিন (যেমন: STF-01)।');
+      setError('স্টাফ আইডি বা কোড দিন (যেমন: NBP-01)।');
       return;
     }
     if (!pin.trim() || pin.trim().length < 3) {
@@ -269,7 +269,7 @@ export const StaffManagementModal: React.FC<StaffManagementModalProps> = ({
                           required
                           value={staffCode}
                           onChange={(e) => setStaffCode(e.target.value.toUpperCase())}
-                          placeholder="যেমন: STF-01"
+                          placeholder="যেমন: NBP-01"
                           className="w-full text-xs pl-8 pr-3 py-2 uppercase font-mono font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:text-slate-100"
                         />
                       </div>

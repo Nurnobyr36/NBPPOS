@@ -116,7 +116,7 @@ export const PurchaseFormView: React.FC<PurchaseFormViewProps> = ({
     const supplier = suppliers.find((s) => s.id === supplierId);
     const dateStr = new Date().toISOString().slice(0, 7).replace('-', '');
     const rand = Math.floor(100 + Math.random() * 900);
-    const invoiceNo = `PUR-${dateStr}-${rand}`;
+    const invoiceNo = `NBP-PUR-${dateStr}-${rand}`;
 
     createPurchase({
       invoiceNo,

@@ -216,7 +216,7 @@ export const ProductFormView: React.FC<ProductFormViewProps> = ({
                   required
                   value={sku}
                   onChange={(e) => setSku(e.target.value)}
-                  placeholder="PRD-10293"
+                  placeholder="NBP-10293"
                   className="flex-1 text-xs font-mono px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:text-slate-100"
                 />
                 <button

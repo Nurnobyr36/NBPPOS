@@ -295,7 +295,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const nameClean = data.name.trim();
     const pinClean = data.pin.trim();
 
-    if (!codeClean) throw new Error('অনুগ্রহ করে স্টাফ কোড বা আইডি দিন (যেমন: STF-01)');
+    if (!codeClean) throw new Error('অনুগ্রহ করে স্টাফ কোড বা আইডি দিন (যেমন: NBP-01)');
     if (!nameClean) throw new Error('স্টাফের পুরো নাম প্রদান করুন');
     if (!pinClean || pinClean.length < 3) throw new Error('কমপক্ষে ৩ বা ৪ ডিজিটের পিন কোড দিন');
 
