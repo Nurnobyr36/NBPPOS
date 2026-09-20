@@ -15,7 +15,9 @@ import {
   Users,
   ShieldCheck,
   KeyRound,
+  Smartphone,
 } from 'lucide-react';
+import { PWAInstallButton } from '../components/PWAInstallButton';
 import { ShopSettings, Language } from '../types';
 import {
   saveShopSettings,
@@ -344,6 +346,26 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
           </div>
         )}
+
+        {/* PWA & Offline App Section */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-2xs space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2.5">
+            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+              <Smartphone className="w-4 h-4 text-emerald-600" />
+              প্রগ্রেসিভ ওয়েব অ্যাপ (PWA) ও অফলাইন ইনস্টলেশন
+            </h3>
+            <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full flex items-center gap-1">
+              <CheckCircle2 className="w-3 h-3" />
+              PWA সক্রিয়
+            </span>
+          </div>
+
+          <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+            SmartShop POS সম্পূর্ণ PWA কমপ্লায়েন্ট। আপনি এটি মোবাইল (Android / iOS) বা কম্পিউটারে (Windows / macOS / ChromeOS) ব্রাউজার ছাড়াই সরাসরি ফুলস্ক্রিন নেটিভ অ্যাপের মতো ইনস্টল করে ব্যবহার করতে পারেন। অফলাইনেও ক্যাশ মেমোরি থেকে নির্বিঘ্নে চলবে।
+          </p>
+
+          <PWAInstallButton variant="banner" />
+        </div>
 
         {/* Backup & Demo Reset */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-2xs space-y-3">

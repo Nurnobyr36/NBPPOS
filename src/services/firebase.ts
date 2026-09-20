@@ -3,6 +3,8 @@ import { getAuth } from 'firebase/auth';
 import {
   initializeFirestore,
   getFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   doc,
   getDoc,
   collection,
@@ -15,22 +17,48 @@ import {
 import firebaseConfig from '../../firebase-applet-config.json';
 import { Product, Sale, Purchase, Customer, Supplier, StockMovement, ShopSettings } from '../types';
 
-// Suppress benign internal network/retry warnings from cluttering error logs
-setLogLevel('error');
+// Suppress internal Firestore network connection/retry logs from polluting console error triggers
+try {
+  setLogLevel('silent');
+} catch {
+  // Ignore if already set
+}
 
 // Initialize Firebase
 export const app = initializeApp(firebaseConfig);
 
-// CRITICAL: Connect directly to the provisioned database ID with long-polling
-// Long-polling prevents WebChannel streaming connection failures in container and proxy environments
-export const db = initializeFirestore(
-  app,
-  {
-    experimentalForceLongPolling: true,
-    ignoreUndefinedProperties: true,
-  },
-  firebaseConfig.firestoreDatabaseId
-);
+// Initialize Firestore with offline persistence and resilient auto-detect transport
+function initFirestoreInstance() {
+  const dbId = firebaseConfig.firestoreDatabaseId;
+  try {
+    return initializeFirestore(
+      app,
+      {
+        localCache: persistentLocalCache({
+          tabManager: persistentMultipleTabManager(),
+        }),
+        experimentalAutoDetectLongPolling: true,
+        ignoreUndefinedProperties: true,
+      },
+      dbId
+    );
+  } catch (err) {
+    try {
+      return initializeFirestore(
+        app,
+        {
+          experimentalAutoDetectLongPolling: true,
+          ignoreUndefinedProperties: true,
+        },
+        dbId
+      );
+    } catch {
+      return getFirestore(app, dbId);
+    }
+  }
+}
+
+export const db = initFirestoreInstance();
 export const auth = getAuth(app);
 
 // Helper to remove undefined fields recursively so Firestore setDoc never throws unsupported field value error

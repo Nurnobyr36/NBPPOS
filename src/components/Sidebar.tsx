@@ -19,6 +19,7 @@ import {
 import { Language } from '../types';
 import { translations } from '../utils/formatters';
 import { useAuth } from '../context/AuthContext';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface SidebarProps {
   currentTab: string;
@@ -187,6 +188,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Footer Info */}
         <div className="p-3 border-t border-emerald-900/60 bg-emerald-950/90 text-xs space-y-2">
+          {/* PWA Install Button */}
+          <PWAInstallButton variant="sidebar" />
           {/* Designated Admin: Staff Management Button */}
           {canManageStaff && (
             <button

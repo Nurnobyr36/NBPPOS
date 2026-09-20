@@ -37,6 +37,7 @@ import {
 } from './services/firebase';
 import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
+import { OfflineIndicator } from './components/OfflineIndicator';
 import { DashboardView } from './views/DashboardView';
 import { PosView } from './views/PosView';
 import { ProductsView } from './views/ProductsView';
@@ -567,6 +568,9 @@ export function App() {
         isOpen={isStaffModalOpen}
         onClose={() => setIsStaffModalOpen(false)}
       />
+
+      {/* PWA Offline Mode Indicator */}
+      <OfflineIndicator />
     </div>
   );
 }

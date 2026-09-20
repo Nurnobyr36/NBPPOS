@@ -22,6 +22,7 @@ import {
 import { Language, Product, Sale } from '../types';
 import { formatMoney } from '../utils/formatters';
 import { useAuth } from '../context/AuthContext';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface TopbarProps {
   onToggleMobileMenu: () => void;
@@ -280,6 +281,9 @@ export const Topbar: React.FC<TopbarProps> = ({
             {cloudStatus === 'connected' ? (lang === 'bn' ? 'ফায়ারব্যাস সংযুক্ত' : 'Firebase Live') : (lang === 'bn' ? 'অফলাইন' : 'Offline')}
           </span>
         </div>
+
+        {/* PWA Install Button */}
+        <PWAInstallButton variant="compact" />
 
         {/* Quick POS Launch Button (desktop) */}
         {onQuickPos && (
