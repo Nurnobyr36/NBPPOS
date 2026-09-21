@@ -1,15 +1,15 @@
 import { Product, Customer, Supplier, Sale, Purchase, ShopSettings, StockMovement } from '../types';
 
 export const initialShopSettings: ShopSettings = {
-  shopName: 'স্মার্টশপ জেনারেল স্টোর',
+  shopName: 'নিহাদ বিজনেস পয়েন্ট',
   tagline: 'ন্যায্য মূল্যে সেরা পণ্যের বিশ্বস্ত প্রতিষ্ঠান',
-  ownerName: 'মো: রফিকুল ইসলাম',
-  phone: '01712-345678',
-  email: 'smartshop.pos@gmail.com',
-  address: 'দোকান নং ১২, নিউ মার্কেট রোড, ঢাকা-১২০৫',
+  ownerName: 'নুরনবী রহমান',
+  phone: '০১৭৭০২৫০৯৮৮',
+  email: 'admin@nihadbp.top',
+  address: 'নিহাদ বিজনেস পয়েন্ট, খোন্দকার খুররম মার্কেট, চৌরাস্তা মোড়',
   currencySymbol: '৳',
   defaultVatRate: 0,
-  invoiceFooter: 'আমাদের সাথে থাকার জন্য ধন্যবাদ! বিক্রিত মাল ৭ দিনের মধ্যে পরিবর্তনযোগ্য।',
+  invoiceFooter: 'আমাদের কাছ থেকে পণ্য ক্রয় করার জন্য ধন্যবাদ,আবার আসবে।',
   logoUrl: '',
   imgbbApiKey: '',
 };

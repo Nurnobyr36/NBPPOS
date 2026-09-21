@@ -41,7 +41,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isOpenMobile,
   onCloseMobile,
   lowStockCount = 0,
-  shopName = 'SmartShop POS',
+  shopName = 'নিহাদ বিজনেস পয়েন্ট',
   logoUrl,
   onOpenAuthModal,
   onOpenStaffManagement,
@@ -112,15 +112,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 className="w-9 h-9 rounded-xl object-cover border border-emerald-700/60 shadow-md shrink-0 bg-white"
               />
             ) : (
-              <div className="w-9 h-9 rounded-xl bg-emerald-600 group-hover:bg-emerald-500 text-white font-black text-lg flex items-center justify-center shadow-md shadow-emerald-900/40 shrink-0 transition-colors">
-                SS
+              <div className="w-9 h-9 rounded-xl bg-emerald-600 group-hover:bg-emerald-500 text-white font-black text-sm flex items-center justify-center shadow-md shadow-emerald-900/40 shrink-0 transition-colors">
+                নি
               </div>
             )}
             <div className="min-w-0">
               <h1 className="font-bold text-sm tracking-tight text-white truncate">
-                {shopName || 'SmartShop POS'}
+                {shopName || 'নিহাদ বিজনেস পয়েন্ট'}
               </h1>
-              <p className="text-[11px] text-emerald-400/90 font-medium">স্মার্টশপ পিওএস</p>
+              <p className="text-[11px] text-emerald-400/90 font-medium">নিহাদ টেকনোলজিস POS</p>
             </div>
           </button>
           <button

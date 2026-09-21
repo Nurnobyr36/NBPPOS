@@ -80,7 +80,7 @@ export const InvoiceView: React.FC<InvoiceViewProps> = ({
   const totalSavings = itemDiscountsTotal + (Number(sale.invoiceDiscount) || 0);
 
   // Verification QR data string
-  const qrVerificationData = `SMARTSHOP VERIFIED E-INVOICE\nInvoice: #${sale.invoiceNo}\nDate: ${new Date(sale.createdAt).toLocaleDateString()}\nShop: ${shopSettings.shopName} (${shopSettings.phone || ''})\nCustomer: ${sale.customerName || 'General Customer'}\nItems: ${(sale.items || []).length}\nTotal: ${currencySymbol} ${sale.total.toFixed(2)}\nPaid: ${currencySymbol} ${sale.paidAmount.toFixed(2)}\nDue: ${currencySymbol} ${sale.dueAmount.toFixed(2)}\nStatus: ${sale.dueAmount <= 0 ? 'PAID' : 'DUE'}`;
+  const qrVerificationData = `NIHAD TECHNOLOGIES POS VERIFIED E-INVOICE\nInvoice: #${sale.invoiceNo}\nDate: ${new Date(sale.createdAt).toLocaleDateString()}\nShop: ${shopSettings.shopName} (${shopSettings.phone || ''})\nCustomer: ${sale.customerName || 'General Customer'}\nItems: ${(sale.items || []).length}\nTotal: ${currencySymbol} ${sale.total.toFixed(2)}\nPaid: ${currencySymbol} ${sale.paidAmount.toFixed(2)}\nDue: ${currencySymbol} ${sale.dueAmount.toFixed(2)}\nStatus: ${sale.dueAmount <= 0 ? 'PAID' : 'DUE'}`;
 
   const handlePrint = () => {
     window.print();
@@ -158,7 +158,8 @@ export const InvoiceView: React.FC<InvoiceViewProps> = ({
 ✅ পরিশোধ: ${formatMoney(sale.paidAmount, currencySymbol)}
 ${sale.dueAmount > 0 ? `⚠️ বাকি: ${formatMoney(sale.dueAmount, currencySymbol)}` : '🎉 সম্পূর্ণ পরিশোধিত'}
 --------------------------------
-${shopSettings.invoiceFooter || 'ধন্যবাদ, আবার আসবেন!'}`;
+${shopSettings.invoiceFooter || 'আমাদের কাছ থেকে পণ্য ক্রয় করার জন্য ধন্যবাদ,আবার আসবে।'}
+নিহাদ টেকনোলজিস POS • সিকিউর ডিজিটাল ইনভয়েসিং সিস্টেম`;
 
     if (navigator.clipboard) {
       navigator.clipboard.writeText(text);
@@ -183,7 +184,8 @@ ${(sale.items || []).map((it) => `• ${it.name} (${it.qty} টি) = ${formatMo
 *পরিশোধিত:* ${formatMoney(sale.paidAmount, currencySymbol)}
 ${sale.dueAmount > 0 ? `*বকেয়া বাকি:* ${formatMoney(sale.dueAmount, currencySymbol)}` : '*পরিশোধ স্ট্যাটাস:* সম্পূর্ণ পরিশোধিত'}
 ---------------------------
-_${shopSettings.invoiceFooter || 'আমাদের সাথে থাকার জন্য আন্তরিক ধন্যবাদ!'}_`;
+_${shopSettings.invoiceFooter || 'আমাদের কাছ থেকে পণ্য ক্রয় করার জন্য ধন্যবাদ,আবার আসবে।'}_
+*নিহাদ টেকনোলজিস POS • সিকিউর ডিজিটাল ইনভয়েসিং সিস্টেম*`;
 
     let phone = (sale.customerPhone || '').replace(/[^0-9]/g, '');
     if (phone.startsWith('01')) {
@@ -940,10 +942,10 @@ _${shopSettings.invoiceFooter || 'আমাদের সাথে থাকা�
               {/* Footer Note */}
               <div className="text-center pt-2 text-xs space-y-1 text-slate-500 dark:text-slate-400">
                 <p className="font-semibold text-slate-800 dark:text-slate-200">
-                  {shopSettings.invoiceFooter || 'ধন্যবাদ, আপনার দিনটি শুভ হোক!'}
+                  {shopSettings.invoiceFooter || 'আমাদের কাছ থেকে পণ্য ক্রয় করার জন্য ধন্যবাদ,আবার আসবে।'}
                 </p>
-                <p className="text-[10px] text-slate-400">
-                  SmartShop POS • সিকিউর ডিজিটাল ইনভয়েসিং সিস্টেম
+                <p className="text-[10px] text-slate-400 font-medium">
+                  নিহাদ টেকনোলজিস POS • সিকিউর ডিজিটাল ইনভয়েসিং সিস্টেম
                 </p>
               </div>
             </div>
@@ -1110,11 +1112,14 @@ _${shopSettings.invoiceFooter || 'আমাদের সাথে থাকা�
             </div>
 
             {/* Thermal QR & Barcode */}
-            <div className="mt-4 pt-3 border-t border-dashed border-slate-400 flex flex-col items-center space-y-2">
+            <div className="mt-4 pt-3 border-t border-dashed border-slate-400 flex flex-col items-center space-y-1.5">
               <InvoiceQrCode data={qrVerificationData} size={75} />
               <BarcodeSvg value={sale.invoiceNo} height={32} />
-              <p className="text-xs font-semibold text-slate-800 text-center mt-2">
-                {shopSettings.invoiceFooter || 'ধন্যবাদ, আবার আসবেন!'}
+              <p className="text-xs font-semibold text-slate-800 text-center mt-2 leading-relaxed">
+                {shopSettings.invoiceFooter || 'আমাদের কাছ থেকে পণ্য ক্রয় করার জন্য ধন্যবাদ,আবার আসবে।'}
+              </p>
+              <p className="text-[10px] text-slate-500 text-center font-medium">
+                নিহাদ টেকনোলজিস POS • সিকিউর ডিজিটাল ইনভয়েসিং সিস্টেম
               </p>
             </div>
             </div>
@@ -1185,9 +1190,14 @@ _${shopSettings.invoiceFooter || 'আমাদের সাথে থাকা�
               )}
             </div>
 
-            <div className="mt-3 pt-2 border-t border-dashed border-slate-400 text-center flex flex-col items-center">
+            <div className="mt-3 pt-2 border-t border-dashed border-slate-400 text-center flex flex-col items-center space-y-1">
               <InvoiceQrCode data={qrVerificationData} size={65} />
-              <p className="text-[10px] mt-1">ধন্যবাদ!</p>
+              <p className="text-[10px] mt-1 font-semibold text-slate-800 text-center leading-tight">
+                {shopSettings.invoiceFooter || 'আমাদের কাছ থেকে পণ্য ক্রয় করার জন্য ধন্যবাদ,আবার আসবে।'}
+              </p>
+              <p className="text-[8px] text-slate-500 text-center">
+                নিহাদ টেকনোলজিস POS • সিকিউর ডিজিটাল ইনভয়েসিং সিস্টেম
+              </p>
             </div>
             </div>
           </div>
@@ -1406,13 +1416,23 @@ _${shopSettings.invoiceFooter || 'আমাদের সাথে থাকা�
             </div>
 
             {/* Authorized Signatures */}
-            <div className="flex justify-between items-end pt-16 text-xs text-slate-700">
+            <div className="flex justify-between items-end pt-14 text-xs text-slate-700">
               <div className="text-center border-t border-slate-400 pt-1.5 w-44">
                 ক্রেতার স্বাক্ষর
               </div>
               <div className="text-center border-t border-slate-400 pt-1.5 w-44">
                 কর্তৃপক্ষের স্বাক্ষর ও সিল
               </div>
+            </div>
+
+            {/* Invoice Footer Note */}
+            <div className="text-center pt-8 text-xs space-y-1 text-slate-500">
+              <p className="font-semibold text-slate-800">
+                {shopSettings.invoiceFooter || 'আমাদের কাছ থেকে পণ্য ক্রয় করার জন্য ধন্যবাদ,আবার আসবে।'}
+              </p>
+              <p className="text-[10px] text-slate-400 font-medium">
+                নিহাদ টেকনোলজিস POS • সিকিউর ডিজিটাল ইনভয়েসিং সিস্টেম
+              </p>
             </div>
             </div>
           </div>

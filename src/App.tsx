@@ -276,12 +276,14 @@ export function App() {
 
     const unsubSettings = subscribeToShopSettings(
       (cloudSettings) => {
-        if (cloudSettings && cloudSettings.shopName) {
+        if (cloudSettings && cloudSettings.shopName && cloudSettings.shopName !== 'স্মার্টশপ জেনারেল স্টোর') {
           setShopSettings(cloudSettings);
           saveShopSettings(cloudSettings);
         } else {
           const locals = getShopSettings();
           if (locals && locals.shopName) {
+            setShopSettings(locals);
+            saveShopSettings(locals);
             syncShopSettingsToFirestore(locals).catch(() => {});
           }
         }

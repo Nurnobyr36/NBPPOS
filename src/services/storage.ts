@@ -547,7 +547,22 @@ export function addStockMovement(movement: Omit<StockMovement, 'id' | 'createdAt
 
 // ---------------- SETTINGS ----------------
 export function getShopSettings(): ShopSettings {
-  return safeGet<ShopSettings>(STORAGE_KEYS.SETTINGS, initialShopSettings);
+  const current = safeGet<ShopSettings>(STORAGE_KEYS.SETTINGS, initialShopSettings);
+  if (!current || !current.shopName || current.shopName === 'স্মার্টশপ জেনারেল স্টোর') {
+    const upgraded: ShopSettings = {
+      ...initialShopSettings,
+      ...(current || {}),
+      shopName: initialShopSettings.shopName,
+      ownerName: initialShopSettings.ownerName,
+      phone: initialShopSettings.phone,
+      email: initialShopSettings.email,
+      address: initialShopSettings.address,
+      invoiceFooter: initialShopSettings.invoiceFooter,
+    };
+    safeSet(STORAGE_KEYS.SETTINGS, upgraded);
+    return upgraded;
+  }
+  return current;
 }
 
 export function saveShopSettings(settings: ShopSettings): void {
