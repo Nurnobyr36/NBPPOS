@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   TrendingUp,
   DollarSign,
@@ -16,6 +16,7 @@ import {
 import { Product, Sale, Customer, Language } from '../types';
 import { formatMoney, formatDate, translations } from '../utils/formatters';
 import { useAuth } from '../context/AuthContext';
+import { TodayProfitModal } from '../components/TodayProfitModal';
 
 interface DashboardViewProps {
   products?: Product[];
@@ -40,6 +41,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 }) => {
   const t = translations[lang];
   const { canViewBuyPrice } = useAuth();
+  const [isProfitModalOpen, setIsProfitModalOpen] = useState(false);
 
   // Calculations
   const todayStr = new Date().toISOString().split('T')[0];
@@ -47,6 +49,33 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const todaySalesAmount = todaySales.reduce((sum, s) => sum + (s.total || 0), 0);
   const totalSalesAmount = sales.reduce((sum, s) => sum + (s.total || 0), 0);
   const totalDueAmount = customers.reduce((sum, c) => sum + (c.currentDue || 0), 0);
+
+  // Profit calculation helper for each sale
+  const getSaleProfit = (s: Sale): number => {
+    if (typeof s.profit === 'number' && !isNaN(s.profit)) {
+      return s.profit;
+    }
+    const totalCost = (s.items || []).reduce((sum, it) => {
+      let cost = it.purchasePrice;
+      if (cost === undefined || cost === null || isNaN(cost) || cost === 0) {
+        const matched = products.find(
+          (p) => p.id === it.productId || p.name === it.name
+        );
+        if (matched && typeof matched.purchasePrice === 'number') {
+          cost = matched.purchasePrice;
+        }
+      }
+      return sum + (Number(cost) || 0) * (Number(it.qty) || 1);
+    }, 0);
+    return Math.round((s.total || 0) - totalCost);
+  };
+
+  // Today's total profit and overall profit
+  const todayProfit = todaySales.reduce((sum, s) => sum + getSaleProfit(s), 0);
+  const totalProfit = sales.reduce((sum, s) => sum + getSaleProfit(s), 0);
+  const todayProfitMargin = todaySalesAmount > 0
+    ? Math.round((todayProfit / todaySalesAmount) * 100)
+    : 0;
 
   // Admin purchase price and stock valuation
   const totalStockPurchaseValue = products.reduce(
@@ -64,7 +93,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   );
 
   // Group sales by past 7 days for the chart
-  const days: { label: string; dateStr: string; amount: number }[] = [];
+  const days: { label: string; dateStr: string; amount: number; profit: number }[] = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
@@ -72,10 +101,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const dayName = d.toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-US', {
       weekday: 'short',
     });
-    const amount = sales
-      .filter((s) => s.createdAt.startsWith(dateStr))
-      .reduce((sum, s) => sum + (s.total || 0), 0);
-    days.push({ label: dayName, dateStr, amount });
+    const daySalesList = sales.filter((s) => s.createdAt.startsWith(dateStr));
+    const amount = daySalesList.reduce((sum, s) => sum + (s.total || 0), 0);
+    const profit = daySalesList.reduce((sum, s) => sum + getSaleProfit(s), 0);
+    days.push({ label: dayName, dateStr, amount, profit });
   }
 
   const maxAmount = Math.max(...days.map((d) => d.amount), 1000);
@@ -90,7 +119,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             {t.dashboard}
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            দোকানের প্রতিদিনের বিক্রয়, স্টক ও বকেয়া হিসাবের সার্বিক চিত্র
+            দোকানের প্রতিদিনের বিক্রয়, লাভ-মুনাফা, স্টক ও বকেয়া হিসাবের সার্বিক চিত্র
           </p>
         </div>
 
@@ -116,7 +145,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </div>
 
       {/* KPI Cards Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
         {/* Today's Sales */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4 border-l-emerald-600 rounded-xl p-4 shadow-2xs">
           <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-1.5">
@@ -132,6 +161,39 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             আজ {todaySales.length} টি ইনভয়েস সম্পন্ন
           </p>
         </div>
+
+        {/* Today's Profit (আজকের বিক্রি থেকে লাভ) - Clickable to open breakdown */}
+        <button
+          type="button"
+          onClick={() => setIsProfitModalOpen(true)}
+          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4 border-l-purple-600 rounded-xl p-4 shadow-2xs relative overflow-hidden text-left hover:border-purple-400 dark:hover:border-purple-500 hover:shadow-md transition-all group cursor-pointer active:scale-[0.99] focus:outline-hidden focus:ring-2 focus:ring-purple-500/20"
+          title="আজকের কোন পণ্য থেকে কত লাভ হয়েছে দেখতে ক্লিক করুন"
+        >
+          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-1.5">
+            <span className="text-xs font-bold text-purple-700 dark:text-purple-400 flex items-center gap-1 group-hover:underline">
+              আজকের লাভ (Profit)
+            </span>
+            <div className="p-1.5 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400 group-hover:bg-purple-600 group-hover:text-white transition-colors">
+              <Coins className="w-4 h-4" />
+            </div>
+          </div>
+          <div
+            className={`text-lg sm:text-xl font-black tabular-nums ${
+              todayProfit >= 0 ? 'text-purple-700 dark:text-purple-300' : 'text-rose-600 dark:text-rose-400'
+            }`}
+          >
+            {todayProfit >= 0 ? '+' : ''}
+            {formatMoney(todayProfit, currencySymbol)}
+          </div>
+          <div className="flex items-center justify-between mt-1 text-[11px]">
+            <span className="text-slate-500 dark:text-slate-400">
+              মার্জিন: <strong className="text-purple-600 dark:text-purple-400 font-bold">{todayProfitMargin}%</strong>
+            </span>
+            <span className="text-[10px] text-purple-700 dark:text-purple-300 bg-purple-100/90 dark:bg-purple-950/90 px-1.5 py-0.5 rounded font-semibold group-hover:bg-purple-600 group-hover:text-white transition-colors flex items-center gap-0.5">
+              পণ্যভিত্তিক লাভ ↗
+            </span>
+          </div>
+        </button>
 
         {/* Total Sales */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4 border-l-teal-600 rounded-xl p-4 shadow-2xs">
@@ -170,7 +232,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* Low Stock Alert */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4 border-l-rose-500 rounded-xl p-4 shadow-2xs">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4 border-l-rose-500 rounded-xl p-4 shadow-2xs col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-1.5">
             <span className="text-xs font-medium">{t.low_stock_count}</span>
             <div className="p-1.5 rounded-lg bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400">
@@ -197,10 +259,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div>
               <h3 className="font-bold text-sm text-slate-100 flex items-center gap-2">
                 <Boxes className="w-4 h-4 text-emerald-400" />
-                এডমিন ইনভেন্টরি ও কেনা দাম হিসাব
+                এডমিন ইনভেন্টরি, কেনা দাম ও লাভ হিসাব
               </h3>
               <p className="text-xs text-slate-400">
-                বর্তমান মজুদ পণ্যের ক্রয় মূল্য (কেনা দাম), বিক্রয় মূল্য এবং সম্ভাব্য মোট মুনাফা
+                বর্তমান মজুদ পণ্যের ক্রয় মূল্য (কেনা দাম), বিক্রয় মূল্য এবং আজকের বিক্রির অর্জিত লাভ
               </p>
             </div>
             <button
@@ -212,7 +274,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-3.5">
             <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/50">
               <span className="text-[11px] font-semibold text-amber-400 flex items-center gap-1.5">
                 <Wallet className="w-3.5 h-3.5" /> মোট স্টক কেনা দাম (ক্রয় মূল্য)
@@ -234,13 +296,39 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
 
             <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/50">
-              <span className="text-[11px] font-semibold text-purple-400 flex items-center gap-1.5">
-                <Coins className="w-3.5 h-3.5" /> সম্ভাব্য নিট মুনাফা (প্রফিট)
+              <span className="text-[11px] font-semibold text-teal-400 flex items-center gap-1.5">
+                <Coins className="w-3.5 h-3.5" /> স্টক থেকে সম্ভাব্য মুনাফা
               </span>
-              <div className="text-lg sm:text-xl font-black text-emerald-400 mt-1 tabular-nums">
+              <div className="text-lg sm:text-xl font-black text-teal-300 mt-1 tabular-nums">
                 +{formatMoney(totalEstimatedProfit, currencySymbol)}
               </div>
-              <p className="text-[10px] text-slate-400 mt-0.5">বিক্রয় মূল্য ও কেনা দামের ব্যবধান</p>
+              <p className="text-[10px] text-slate-400 mt-0.5">বর্তমান স্টকের বিক্রয় ও কেনা দামের ব্যবধান</p>
+            </div>
+
+            <div className="bg-purple-950/40 rounded-xl p-3 border border-purple-800/50 flex flex-col justify-between">
+              <div>
+                <span className="text-[11px] font-semibold text-purple-300 flex items-center gap-1.5">
+                  <TrendingUp className="w-3.5 h-3.5 text-purple-400" /> আজকের বিক্রি থেকে লাভ
+                </span>
+                <div
+                  className={`text-lg sm:text-xl font-black mt-1 tabular-nums ${
+                    todayProfit >= 0 ? 'text-purple-200' : 'text-rose-300'
+                  }`}
+                >
+                  {todayProfit >= 0 ? '+' : ''}
+                  {formatMoney(todayProfit, currencySymbol)}
+                </div>
+                <p className="text-[10px] text-purple-300/80 mt-0.5">
+                  আজকের মোট {todaySales.length} টি বিক্রির অর্জিত নিট লাভ (মার্জিন: {todayProfitMargin}%)
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsProfitModalOpen(true)}
+                className="mt-2.5 text-[11px] text-purple-300 hover:text-white font-semibold underline flex items-center gap-1 cursor-pointer w-fit"
+              >
+                পণ্যভিত্তিক লাভ দেখুন →
+              </button>
             </div>
           </div>
         </div>
@@ -269,9 +357,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               return (
                 <div key={idx} className="flex-1 flex flex-col items-center gap-2 h-full justify-end group">
                   {/* Amount Tooltip on hover */}
-                  <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                    {formatMoney(day.amount, currencySymbol)}
-                  </span>
+                  <div className="text-[10px] font-bold text-slate-600 dark:text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap bg-white dark:bg-slate-800 px-1.5 py-0.5 rounded shadow border border-slate-200 dark:border-slate-700 flex flex-col items-center">
+                    <span>{formatMoney(day.amount, currencySymbol)}</span>
+                    <span className="text-[9px] text-purple-600 dark:text-purple-400 font-semibold">
+                      লাভ: {day.profit >= 0 ? '+' : ''}{formatMoney(day.profit, currencySymbol)}
+                    </span>
+                  </div>
                   <div className="w-full max-w-[40px] bg-slate-100 dark:bg-slate-800 rounded-t-lg h-32 flex items-end p-0.5">
                     <div
                       className={`w-full rounded-t-md transition-all duration-500 ${
@@ -389,59 +480,86 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <th className="py-2.5 px-3 font-semibold">কাস্টমার</th>
                 <th className="py-2.5 px-3 font-semibold">আইটেম সংখ্যা</th>
                 <th className="py-2.5 px-3 font-semibold">সর্বমোট</th>
+                <th className="py-2.5 px-3 font-semibold text-purple-600 dark:text-purple-400">লাভ (Profit)</th>
                 <th className="py-2.5 px-3 font-semibold">পরিশোধ</th>
                 <th className="py-2.5 px-3 font-semibold">বাকি</th>
                 <th className="py-2.5 px-3 font-semibold text-right">অ্যাকশন</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {sales.slice(0, 6).map((sale) => (
-                <tr
-                  key={sale.id}
-                  className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-                >
-                  <td className="py-2.5 px-3 font-mono font-bold text-emerald-700 dark:text-emerald-400">
-                    {sale.invoiceNo}
-                  </td>
-                  <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300">
-                    {formatDate(sale.createdAt, true)}
-                  </td>
-                  <td className="py-2.5 px-3 font-medium text-slate-800 dark:text-slate-200">
-                    {sale.customerName || 'Walk-in'}
-                  </td>
-                  <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300">
-                    {sale.items?.length || 0} টি
-                  </td>
-                  <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-slate-100 tabular-nums">
-                    {formatMoney(sale.total, currencySymbol)}
-                  </td>
-                  <td className="py-2.5 px-3 text-emerald-600 dark:text-emerald-400 font-semibold tabular-nums">
-                    {formatMoney(sale.paidAmount, currencySymbol)}
-                  </td>
-                  <td className="py-2.5 px-3 tabular-nums">
-                    {sale.dueAmount > 0 ? (
-                      <span className="text-rose-600 dark:text-rose-400 font-bold">
-                        {formatMoney(sale.dueAmount, currencySymbol)}
+              {sales.slice(0, 6).map((sale) => {
+                const sProfit = getSaleProfit(sale);
+                return (
+                  <tr
+                    key={sale.id}
+                    className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                  >
+                    <td className="py-2.5 px-3 font-mono font-bold text-emerald-700 dark:text-emerald-400">
+                      {sale.invoiceNo}
+                    </td>
+                    <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300">
+                      {formatDate(sale.createdAt, true)}
+                    </td>
+                    <td className="py-2.5 px-3 font-medium text-slate-800 dark:text-slate-200">
+                      {sale.customerName || 'Walk-in'}
+                    </td>
+                    <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300">
+                      {sale.items?.length || 0} টি
+                    </td>
+                    <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-slate-100 tabular-nums">
+                      {formatMoney(sale.total, currencySymbol)}
+                    </td>
+                    <td className="py-2.5 px-3 font-bold tabular-nums">
+                      <span
+                        className={
+                          sProfit >= 0
+                            ? 'text-purple-600 dark:text-purple-400'
+                            : 'text-rose-600 dark:text-rose-400'
+                        }
+                      >
+                        {sProfit >= 0 ? '+' : ''}
+                        {formatMoney(sProfit, currencySymbol)}
                       </span>
-                    ) : (
-                      <span className="text-slate-400">-</span>
-                    )}
-                  </td>
-                  <td className="py-2.5 px-3 text-right">
-                    <button
-                      type="button"
-                      onClick={() => onViewInvoice(sale)}
-                      className="px-2.5 py-1 text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/80 text-emerald-700 dark:text-emerald-300 rounded-lg transition-colors cursor-pointer"
-                    >
-                      ইনভয়েস
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="py-2.5 px-3 text-emerald-600 dark:text-emerald-400 font-semibold tabular-nums">
+                      {formatMoney(sale.paidAmount, currencySymbol)}
+                    </td>
+                    <td className="py-2.5 px-3 tabular-nums">
+                      {sale.dueAmount > 0 ? (
+                        <span className="text-rose-600 dark:text-rose-400 font-bold">
+                          {formatMoney(sale.dueAmount, currencySymbol)}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">-</span>
+                      )}
+                    </td>
+                    <td className="py-2.5 px-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => onViewInvoice(sale)}
+                        className="px-2.5 py-1 text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/80 text-emerald-700 dark:text-emerald-300 rounded-lg transition-colors cursor-pointer"
+                      >
+                        ইনভয়েস
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* Today's Product-wise Profit Breakdown Modal */}
+      <TodayProfitModal
+        isOpen={isProfitModalOpen}
+        onClose={() => setIsProfitModalOpen(false)}
+        todaySales={todaySales}
+        products={products}
+        currencySymbol={currencySymbol}
+        onViewInvoice={onViewInvoice}
+        onNavigateToPos={() => onNavigate('pos')}
+      />
     </div>
   );
 };
