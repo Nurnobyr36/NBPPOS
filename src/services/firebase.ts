@@ -12,6 +12,8 @@ import {
   setDoc,
   deleteDoc,
   getDocs,
+  writeBatch,
+  enableNetwork,
   setLogLevel,
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
@@ -358,6 +360,182 @@ export async function syncShopSettingsToFirestore(settings: ShopSettings): Promi
     await setDoc(doc(db, 'shopSettings', 'default'), clean, { merge: true });
   } catch (err) {
     handleFirestoreError(err, OperationType.WRITE, 'shopSettings/default');
+  }
+}
+
+// ---------------- ATOMIC BATCH REAL-TIME SYNC HELPERS ----------------
+
+/**
+ * Atomically commits a sale, all associated product stock deductions,
+ * stock movement logs, and customer ledger updates to Firestore in a single network transaction.
+ * Guarantees all connected mobiles receive the sale & stock update in the exact same snapshot.
+ */
+export async function syncSaleAndStockBatchToFirestore(
+  sale: Sale,
+  updatedProducts: Product[],
+  stockMovements: StockMovement[],
+  updatedCustomer?: Customer
+): Promise<void> {
+  try {
+    const batch = writeBatch(db);
+
+    // 1. Add/Update Sale document
+    const saleRef = doc(db, 'sales', sale.id);
+    batch.set(saleRef, sanitizeDocData(sale), { merge: true });
+
+    // 2. Update each affected product stock
+    updatedProducts.forEach((prod) => {
+      const prodRef = doc(db, 'products', prod.id);
+      batch.set(
+        prodRef,
+        sanitizeDocData({
+          ...prod,
+          updatedAt: new Date().toISOString(),
+        }),
+        { merge: true }
+      );
+    });
+
+    // 3. Log stock movements
+    stockMovements.forEach((mov) => {
+      const movRef = doc(db, 'stockMovements', mov.id);
+      batch.set(movRef, sanitizeDocData(mov), { merge: true });
+    });
+
+    // 4. Update customer balance if applicable
+    if (updatedCustomer) {
+      const custRef = doc(db, 'customers', updatedCustomer.id);
+      batch.set(custRef, sanitizeDocData(updatedCustomer), { merge: true });
+    }
+
+    // Commit atomically in a single payload
+    await batch.commit();
+  } catch (err) {
+    console.error('Error in syncSaleAndStockBatchToFirestore:', err);
+    handleFirestoreError(err, OperationType.WRITE, `sales_batch/${sale.id}`);
+    throw err;
+  }
+}
+
+/**
+ * Atomically commits a manual stock adjustment and its audit movement log to Firestore.
+ */
+export async function syncStockAdjustmentBatchToFirestore(
+  product: Product,
+  movement: StockMovement
+): Promise<void> {
+  try {
+    const batch = writeBatch(db);
+
+    const prodRef = doc(db, 'products', product.id);
+    batch.set(
+      prodRef,
+      sanitizeDocData({
+        ...product,
+        updatedAt: new Date().toISOString(),
+      }),
+      { merge: true }
+    );
+
+    const movRef = doc(db, 'stockMovements', movement.id);
+    batch.set(movRef, sanitizeDocData(movement), { merge: true });
+
+    await batch.commit();
+  } catch (err) {
+    console.error('Error in syncStockAdjustmentBatchToFirestore:', err);
+    handleFirestoreError(err, OperationType.WRITE, `stock_adjust_batch/${product.id}`);
+    throw err;
+  }
+}
+
+/**
+ * Atomically commits a purchase invoice, increased product stocks, movements, and supplier updates.
+ */
+export async function syncPurchaseAndStockBatchToFirestore(
+  purchase: Purchase,
+  updatedProducts: Product[],
+  stockMovements: StockMovement[],
+  updatedSupplier?: Supplier
+): Promise<void> {
+  try {
+    const batch = writeBatch(db);
+
+    const purRef = doc(db, 'purchases', purchase.id);
+    batch.set(purRef, sanitizeDocData(purchase), { merge: true });
+
+    updatedProducts.forEach((prod) => {
+      const prodRef = doc(db, 'products', prod.id);
+      batch.set(
+        prodRef,
+        sanitizeDocData({
+          ...prod,
+          updatedAt: new Date().toISOString(),
+        }),
+        { merge: true }
+      );
+    });
+
+    stockMovements.forEach((mov) => {
+      const movRef = doc(db, 'stockMovements', mov.id);
+      batch.set(movRef, sanitizeDocData(mov), { merge: true });
+    });
+
+    if (updatedSupplier) {
+      const supRef = doc(db, 'suppliers', updatedSupplier.id);
+      batch.set(supRef, sanitizeDocData(updatedSupplier), { merge: true });
+    }
+
+    await batch.commit();
+  } catch (err) {
+    console.error('Error in syncPurchaseAndStockBatchToFirestore:', err);
+    handleFirestoreError(err, OperationType.WRITE, `purchase_batch/${purchase.id}`);
+    throw err;
+  }
+}
+
+/**
+ * Re-enables Firestore network connection immediately.
+ * Call this when a mobile phone wakes up from sleep or when visibility changes to active.
+ */
+export async function reconnectFirestoreNetwork(): Promise<boolean> {
+  try {
+    await enableNetwork(db);
+    return true;
+  } catch (err) {
+    console.warn('reconnectFirestoreNetwork notice:', err);
+    return false;
+  }
+}
+
+/**
+ * Fetches the latest confirmed cloud collections from Firestore server.
+ */
+export async function fetchLatestCloudData(): Promise<{
+  products: Product[];
+  sales: Sale[];
+  stockMovements: StockMovement[];
+}> {
+  try {
+    const [prodSnap, saleSnap, movSnap] = await Promise.all([
+      getDocs(collection(db, 'products')),
+      getDocs(collection(db, 'sales')),
+      getDocs(collection(db, 'stockMovements')),
+    ]);
+
+    const products = prodSnap.docs
+      .map((d) => d.data() as Product)
+      .filter((p) => !isLegacyMockId(p.id));
+    const sales = saleSnap.docs
+      .map((d) => d.data() as Sale)
+      .filter((s) => !isLegacyMockId(s.id));
+    const stockMovements = movSnap.docs
+      .map((d) => d.data() as StockMovement)
+      .filter((m) => !isLegacyMockId(m.id));
+
+    return { products, sales, stockMovements };
+  } catch (err) {
+    console.warn('fetchLatestCloudData error:', err);
+    return { products: [], sales: [], stockMovements: [] };
   }
 }
 

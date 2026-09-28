@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   TrendingUp,
   DollarSign,
@@ -9,14 +9,26 @@ import {
   PlusCircle,
   Receipt,
   ArrowUpRight,
+  ArrowDownRight,
   Boxes,
   Wallet,
   Coins,
+  Calendar,
+  Sparkles,
+  BarChart3,
+  Layers,
+  CheckCircle2,
 } from 'lucide-react';
 import { Product, Sale, Customer, Language } from '../types';
 import { formatMoney, formatDate, translations } from '../utils/formatters';
 import { useAuth } from '../context/AuthContext';
-import { TodayProfitModal } from '../components/TodayProfitModal';
+import { ProfitReportModal } from '../components/ProfitReportModal';
+import {
+  ProfitPeriod,
+  getFullPeriodSummary,
+  getMonthComparison,
+  getBengaliMonthYear,
+} from '../utils/profitAnalytics';
 
 interface DashboardViewProps {
   products?: Product[];
@@ -42,6 +54,38 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const t = translations[lang];
   const { canViewBuyPrice } = useAuth();
   const [isProfitModalOpen, setIsProfitModalOpen] = useState(false);
+  const [profitModalPeriod, setProfitModalPeriod] = useState<ProfitPeriod>('today');
+  const [activeReportTab, setActiveReportTab] = useState<ProfitPeriod>('thisMonth');
+
+  // Multi-period profit calculations
+  const todaySummary = useMemo(() => getFullPeriodSummary(sales, products, 'today'), [sales, products]);
+  const threeDaysSummary = useMemo(() => getFullPeriodSummary(sales, products, '3days'), [sales, products]);
+  const sevenDaysSummary = useMemo(() => getFullPeriodSummary(sales, products, '7days'), [sales, products]);
+  const thisMonthSummary = useMemo(() => getFullPeriodSummary(sales, products, 'thisMonth'), [sales, products]);
+  const lastMonthSummary = useMemo(() => getFullPeriodSummary(sales, products, 'lastMonth'), [sales, products]);
+  const monthComp = useMemo(() => getMonthComparison(sales, products), [sales, products]);
+
+  const activeSummary = useMemo(() => {
+    switch (activeReportTab) {
+      case 'today':
+        return todaySummary;
+      case '3days':
+        return threeDaysSummary;
+      case '7days':
+        return sevenDaysSummary;
+      case 'thisMonth':
+        return thisMonthSummary;
+      case 'lastMonth':
+        return lastMonthSummary;
+      default:
+        return thisMonthSummary;
+    }
+  }, [activeReportTab, todaySummary, threeDaysSummary, sevenDaysSummary, thisMonthSummary, lastMonthSummary]);
+
+  const handleOpenProfitModal = (period: ProfitPeriod) => {
+    setProfitModalPeriod(period);
+    setIsProfitModalOpen(true);
+  };
 
   // Calculations
   const todayStr = new Date().toISOString().split('T')[0];
@@ -165,7 +209,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         {/* Today's Profit (আজকের বিক্রি থেকে লাভ) - Clickable to open breakdown */}
         <button
           type="button"
-          onClick={() => setIsProfitModalOpen(true)}
+          onClick={() => handleOpenProfitModal('today')}
           className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4 border-l-purple-600 rounded-xl p-4 shadow-2xs relative overflow-hidden text-left hover:border-purple-400 dark:hover:border-purple-500 hover:shadow-md transition-all group cursor-pointer active:scale-[0.99] focus:outline-hidden focus:ring-2 focus:ring-purple-500/20"
           title="আজকের কোন পণ্য থেকে কত লাভ হয়েছে দেখতে ক্লিক করুন"
         >
@@ -324,7 +368,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
               <button
                 type="button"
-                onClick={() => setIsProfitModalOpen(true)}
+                onClick={() => handleOpenProfitModal('today')}
                 className="mt-2.5 text-[11px] text-purple-300 hover:text-white font-semibold underline flex items-center gap-1 cursor-pointer w-fit"
               >
                 পণ্যভিত্তিক লাভ দেখুন →
@@ -333,6 +377,364 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Multi-Period Profit & Sales Analytics Section (এই মাস, গত মাস, ৭ দিন, ৩ দিনের রিপোর্ট) */}
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+              <Coins className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+              পর্যায়ক্রমিক লাভ ও বিক্রয় রিপোর্ট (Profit Reports)
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              এই মাস, গত মাস, ৭ দিন ও ৩ দিনের বিক্রয় থেকে অর্জিত নিট লাভ ও মার্জিন বিশ্লেষণ
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => handleOpenProfitModal('thisMonth')}
+            className="text-xs font-bold text-purple-700 dark:text-purple-300 hover:text-purple-900 bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800/80 px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer w-fit"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>পূর্ণাঙ্গ পণ্যভিত্তিক লাভ রিপোর্ট খুলুন →</span>
+          </button>
+        </div>
+
+        {/* 4 Dedicated Period KPI Cards for the requested periods */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+          {/* Last 3 Days Profit */}
+          <div
+            onClick={() => handleOpenProfitModal('3days')}
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4 border-l-blue-600 rounded-2xl p-4 shadow-2xs hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between"
+          >
+            <div>
+              <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-1.5">
+                <span className="text-xs font-bold text-blue-700 dark:text-blue-400 flex items-center gap-1.5 group-hover:underline">
+                  <Calendar className="w-3.5 h-3.5" />
+                  গত ৩ দিনের লাভ
+                </span>
+                <span className="text-[10px] bg-blue-50 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded font-bold">
+                  ৩ দিন
+                </span>
+              </div>
+              <div
+                className={`text-lg sm:text-xl font-black tabular-nums ${
+                  threeDaysSummary.netProfit >= 0
+                    ? 'text-blue-700 dark:text-blue-300'
+                    : 'text-rose-600 dark:text-rose-400'
+                }`}
+              >
+                {threeDaysSummary.netProfit >= 0 ? '+' : ''}
+                {formatMoney(threeDaysSummary.netProfit, currencySymbol)}
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                বিক্রি: <strong className="text-slate-700 dark:text-slate-200">{formatMoney(threeDaysSummary.totalRevenue, currencySymbol)}</strong>
+              </p>
+            </div>
+            <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 text-[11px]">
+              <span className="text-blue-600 dark:text-blue-400 font-semibold">
+                মার্জিন: {threeDaysSummary.marginPercent}%
+              </span>
+              <span className="text-blue-700 dark:text-blue-300 font-bold group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
+                রিপোর্ট ↗
+              </span>
+            </div>
+          </div>
+
+          {/* Last 7 Days Profit */}
+          <div
+            onClick={() => handleOpenProfitModal('7days')}
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4 border-l-indigo-600 rounded-2xl p-4 shadow-2xs hover:border-indigo-400 dark:hover:border-indigo-500 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between"
+          >
+            <div>
+              <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-1.5">
+                <span className="text-xs font-bold text-indigo-700 dark:text-indigo-400 flex items-center gap-1.5 group-hover:underline">
+                  <TrendingUp className="w-3.5 h-3.5" />
+                  গত ৭ দিনের লাভ
+                </span>
+                <span className="text-[10px] bg-indigo-50 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 px-1.5 py-0.5 rounded font-bold">
+                  ৭ দিন
+                </span>
+              </div>
+              <div
+                className={`text-lg sm:text-xl font-black tabular-nums ${
+                  sevenDaysSummary.netProfit >= 0
+                    ? 'text-indigo-700 dark:text-indigo-300'
+                    : 'text-rose-600 dark:text-rose-400'
+                }`}
+              >
+                {sevenDaysSummary.netProfit >= 0 ? '+' : ''}
+                {formatMoney(sevenDaysSummary.netProfit, currencySymbol)}
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                বিক্রি: <strong className="text-slate-700 dark:text-slate-200">{formatMoney(sevenDaysSummary.totalRevenue, currencySymbol)}</strong>
+              </p>
+            </div>
+            <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 text-[11px]">
+              <span className="text-indigo-600 dark:text-indigo-400 font-semibold">
+                মার্জিন: {sevenDaysSummary.marginPercent}%
+              </span>
+              <span className="text-indigo-700 dark:text-indigo-300 font-bold group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
+                রিপোর্ট ↗
+              </span>
+            </div>
+          </div>
+
+          {/* This Month's Profit */}
+          <div
+            onClick={() => handleOpenProfitModal('thisMonth')}
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4 border-l-emerald-600 rounded-2xl p-4 shadow-2xs hover:border-emerald-400 dark:hover:border-emerald-500 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between"
+          >
+            <div>
+              <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-1.5">
+                <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5 group-hover:underline">
+                  <Coins className="w-3.5 h-3.5" />
+                  এই মাসের লাভ ({monthComp.thisMonthLabel})
+                </span>
+                <span className="text-[10px] bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded font-bold">
+                  চলতি মাস
+                </span>
+              </div>
+              <div
+                className={`text-lg sm:text-xl font-black tabular-nums ${
+                  thisMonthSummary.netProfit >= 0
+                    ? 'text-emerald-700 dark:text-emerald-300'
+                    : 'text-rose-600 dark:text-rose-400'
+                }`}
+              >
+                {thisMonthSummary.netProfit >= 0 ? '+' : ''}
+                {formatMoney(thisMonthSummary.netProfit, currencySymbol)}
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                বিক্রি: <strong className="text-slate-700 dark:text-slate-200">{formatMoney(thisMonthSummary.totalRevenue, currencySymbol)}</strong>
+              </p>
+            </div>
+            <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 text-[11px]">
+              <span
+                className={`font-semibold ${
+                  monthComp.isProfitHigher ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                }`}
+              >
+                vs গত মাস: {monthComp.profitGrowthPct >= 0 ? '+' : ''}{monthComp.profitGrowthPct}%
+              </span>
+              <span className="text-emerald-700 dark:text-emerald-300 font-bold group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
+                রিপোর্ট ↗
+              </span>
+            </div>
+          </div>
+
+          {/* Last Month's Profit */}
+          <div
+            onClick={() => handleOpenProfitModal('lastMonth')}
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-4 border-l-purple-600 rounded-2xl p-4 shadow-2xs hover:border-purple-400 dark:hover:border-purple-500 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between"
+          >
+            <div>
+              <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-1.5">
+                <span className="text-xs font-bold text-purple-700 dark:text-purple-400 flex items-center gap-1.5 group-hover:underline">
+                  <Receipt className="w-3.5 h-3.5" />
+                  গত মাসের লাভ ({monthComp.lastMonthLabel})
+                </span>
+                <span className="text-[10px] bg-purple-50 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded font-bold">
+                  পূর্বের মাস
+                </span>
+              </div>
+              <div
+                className={`text-lg sm:text-xl font-black tabular-nums ${
+                  lastMonthSummary.netProfit >= 0
+                    ? 'text-purple-700 dark:text-purple-300'
+                    : 'text-rose-600 dark:text-rose-400'
+                }`}
+              >
+                {lastMonthSummary.netProfit >= 0 ? '+' : ''}
+                {formatMoney(lastMonthSummary.netProfit, currencySymbol)}
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                বিক্রি: <strong className="text-slate-700 dark:text-slate-200">{formatMoney(lastMonthSummary.totalRevenue, currencySymbol)}</strong>
+              </p>
+            </div>
+            <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 text-[11px]">
+              <span className="text-purple-600 dark:text-purple-400 font-semibold">
+                মার্জিন: {lastMonthSummary.marginPercent}%
+              </span>
+              <span className="text-purple-700 dark:text-purple-300 font-bold group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
+                রিপোর্ট ↗
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Interactive Period Switcher & Live Analytics Widget */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div>
+              <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-emerald-600" />
+                ইন্টারেক্টিভ লাভ ও মার্জিন বিশ্লেষণ
+              </h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                নিচের যেকোনো সময়ে ক্লিক করে লাভ ও বিক্রয়ের বিশদ সারাংশ দেখুন
+              </p>
+            </div>
+
+            {/* Tab switchers */}
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
+              {[
+                { id: 'today' as ProfitPeriod, label: '⚡ আজকে' },
+                { id: '3days' as ProfitPeriod, label: '⏱️ গত ৩ দিন' },
+                { id: '7days' as ProfitPeriod, label: '📅 গত ৭ দিন' },
+                { id: 'thisMonth' as ProfitPeriod, label: `📆 এই মাস` },
+                { id: 'lastMonth' as ProfitPeriod, label: `🗓️ গত মাস` },
+              ].map((tab) => {
+                const isActive = activeReportTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveReportTab(tab.id)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                      isActive
+                        ? 'bg-purple-700 text-white shadow-xs'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Active Period Highlights Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="p-3.5 rounded-xl bg-purple-50/80 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/60">
+              <span className="text-[11px] font-semibold text-purple-700 dark:text-purple-300 flex items-center gap-1">
+                <Coins className="w-3.5 h-3.5" /> মোট নিট লাভ
+              </span>
+              <div
+                className={`text-lg sm:text-xl font-black mt-1 tabular-nums ${
+                  activeSummary.netProfit >= 0
+                    ? 'text-purple-700 dark:text-purple-300'
+                    : 'text-rose-600 dark:text-rose-400'
+                }`}
+              >
+                {activeSummary.netProfit >= 0 ? '+' : ''}
+                {formatMoney(activeSummary.netProfit, currencySymbol)}
+              </div>
+              <span className="text-[10px] text-purple-600 dark:text-purple-400 font-semibold">
+                মার্জিন: {activeSummary.marginPercent}%
+              </span>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60">
+              <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
+                <TrendingUp className="w-3.5 h-3.5" /> মোট বিক্রয়মূল্য
+              </span>
+              <div className="text-lg sm:text-xl font-black mt-1 text-emerald-700 dark:text-emerald-300 tabular-nums">
+                {formatMoney(activeSummary.totalRevenue, currencySymbol)}
+              </div>
+              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                {activeSummary.invoiceCount} টি ইনভয়েস
+              </span>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60">
+              <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-300 flex items-center gap-1">
+                <Package className="w-3.5 h-3.5" /> পণ্য ক্রয় খরচ
+              </span>
+              <div className="text-lg sm:text-xl font-black mt-1 text-amber-700 dark:text-amber-300 tabular-nums">
+                {formatMoney(activeSummary.totalCost, currencySymbol)}
+              </div>
+              <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold">
+                বিক্রিত মালের কেনা দাম
+              </span>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60">
+              <span className="text-[11px] font-semibold text-blue-700 dark:text-blue-300 flex items-center gap-1">
+                <Layers className="w-3.5 h-3.5" /> মোট বিক্রিত সংখ্যা
+              </span>
+              <div className="text-lg sm:text-xl font-black mt-1 text-blue-700 dark:text-blue-300 tabular-nums">
+                {activeSummary.unitsSold} টি
+              </div>
+              <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">
+                {activeSummary.productProfitList.length} টি পণ্য বিক্রি
+              </span>
+            </div>
+          </div>
+
+          {/* Month comparison tag when 'thisMonth' is active */}
+          {activeReportTab === 'thisMonth' && (
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-slate-700 dark:text-slate-300">
+                  গত মাসের সাথে তুলনা ({monthComp.lastMonthLabel}):
+                </span>
+                <span
+                  className={`font-black flex items-center gap-1 px-2 py-0.5 rounded-md ${
+                    monthComp.isProfitHigher
+                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300'
+                      : 'bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300'
+                  }`}
+                >
+                  {monthComp.isProfitHigher ? '+' : ''}
+                  {formatMoney(monthComp.profitDiff, currencySymbol)} ({monthComp.profitGrowthPct >= 0 ? '+' : ''}{monthComp.profitGrowthPct}%)
+                </span>
+              </div>
+              <span className="text-slate-500 dark:text-slate-400">
+                গত মাসের মোট লাভ ছিলো: <strong className="text-purple-700 dark:text-purple-300">{formatMoney(monthComp.lastMonthProfit, currencySymbol)}</strong>
+              </span>
+            </div>
+          )}
+
+          {/* Top 3 Profitable Items in this active period */}
+          {activeSummary.productProfitList.length > 0 && (
+            <div className="space-y-2 pt-1">
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                🏆 {activeSummary.label}-এর শীর্ষ লাভজনক পণ্যসমূহ:
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                {activeSummary.productProfitList.slice(0, 3).map((item, idx) => (
+                  <div
+                    key={item.productId}
+                    className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 flex items-center justify-between gap-2"
+                  >
+                    <div className="min-w-0 pr-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-5 h-5 rounded-md bg-purple-100 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 font-bold text-[10px] flex items-center justify-center shrink-0">
+                          {idx + 1}
+                        </span>
+                        <p className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">
+                          {item.productName}
+                        </p>
+                      </div>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 block mt-0.5">
+                        বিক্রি: {item.totalQty} {item.unit || 'টি'} • মার্জিন: {item.marginPercent}%
+                      </span>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="text-xs font-black text-purple-700 dark:text-purple-300 block">
+                        +{formatMoney(item.totalProfit, currencySymbol)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Action button to open full breakdown for this period */}
+          <div className="pt-2 flex justify-end">
+            <button
+              type="button"
+              onClick={() => handleOpenProfitModal(activeReportTab)}
+              className="px-4 py-2 bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-800 hover:to-indigo-800 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-all cursor-pointer"
+            >
+              <Sparkles className="w-4 h-4 text-purple-200" />
+              <span>{activeSummary.label}-এর কোন পণ্য থেকে কত লাভ হয়েছে দেখুন (প্রিন্ট ও রিপোর্ট) →</span>
+            </button>
+          </div>
+        </div>
+      </div>
 
       {/* Visual Chart & Quick Shortcuts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -550,12 +952,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* Today's Product-wise Profit Breakdown Modal */}
-      <TodayProfitModal
+      {/* Multi-Period Product-wise Profit Breakdown Modal */}
+      <ProfitReportModal
         isOpen={isProfitModalOpen}
         onClose={() => setIsProfitModalOpen(false)}
-        todaySales={todaySales}
+        sales={sales}
         products={products}
+        initialPeriod={profitModalPeriod}
         currencySymbol={currencySymbol}
         onViewInvoice={onViewInvoice}
         onNavigateToPos={() => onNavigate('pos')}

@@ -76,6 +76,36 @@ export const PosView: React.FC<PosViewProps> = ({
 
   const barcodeInputRef = useRef<HTMLInputElement>(null);
 
+  // Auto-validate cart against remote stock changes from other mobile devices
+  useEffect(() => {
+    if (cart.length === 0) return;
+    let wasAdjusted = false;
+    const nextCart = cart
+      .map((item) => {
+        const prod = products.find((p) => p.id === item.productId);
+        if (!prod) return item;
+        const available = Math.max(0, prod.currentStock || 0);
+        if (available <= 0) {
+          wasAdjusted = true;
+          return null;
+        }
+        if (item.qty > available) {
+          wasAdjusted = true;
+          return {
+            ...item,
+            qty: available,
+            lineTotal: available * item.rate - item.discount,
+          };
+        }
+        return item;
+      })
+      .filter(Boolean) as SaleItem[];
+
+    if (wasAdjusted) {
+      setCart(nextCart);
+    }
+  }, [products]);
+
   // Extract categories
   const categories = useMemo(() => {
     const set = new Set<string>();

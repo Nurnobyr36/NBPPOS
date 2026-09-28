@@ -42,6 +42,7 @@ interface TopbarProps {
   onSelectSale?: (sale: Sale) => void;
   cloudStatus?: 'connected' | 'syncing' | 'offline';
   onOpenAuthModal?: () => void;
+  onRefreshData?: () => void;
 }
 
 export const Topbar: React.FC<TopbarProps> = ({
@@ -62,6 +63,7 @@ export const Topbar: React.FC<TopbarProps> = ({
   onSelectSale,
   cloudStatus = 'connected',
   onOpenAuthModal,
+  onRefreshData,
 }) => {
   const { sellerName, currentUser, userProfile } = useAuth();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -255,16 +257,18 @@ export const Topbar: React.FC<TopbarProps> = ({
 
       {/* Right: Quick actions, Lang, Theme */}
       <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-        {/* Firebase Cloud Status Indicator */}
-        <div
+        {/* Firebase Cloud Real-time Status Indicator (Visible on all devices/mobiles) */}
+        <button
+          type="button"
           id="topbar-cloud-status"
-          className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all select-none bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+          onClick={onRefreshData}
+          className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all select-none cursor-pointer bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 active:scale-95"
           title={
             cloudStatus === 'connected'
-              ? 'ফায়ারব্যাস ক্লাউড সক্রিয় ও সংযুক্ত'
+              ? 'লাইভ ক্লাউড সক্রিয় (ক্লিক করলে এখনই রিফ্রেশ হবে)'
               : cloudStatus === 'syncing'
               ? 'ক্লাউডে সিঙ্ক হচ্ছে...'
-              : 'অফলাইন মোড'
+              : 'অফলাইন মোড (ক্লিক করে পুনরায় চেষ্টা করুন)'
           }
         >
           {cloudStatus === 'syncing' ? (
@@ -277,10 +281,13 @@ export const Topbar: React.FC<TopbarProps> = ({
           ) : (
             <Cloud className="w-3.5 h-3.5 text-slate-400" />
           )}
-          <span className="text-[11px]">
-            {cloudStatus === 'connected' ? (lang === 'bn' ? 'ফায়ারব্যাস সংযুক্ত' : 'Firebase Live') : (lang === 'bn' ? 'অফলাইন' : 'Offline')}
+          <span className="text-[11px] font-medium hidden xs:inline sm:inline">
+            {cloudStatus === 'connected' ? (lang === 'bn' ? 'লাইভ সিঙ্ক' : 'Live Sync') : (lang === 'bn' ? 'অফলাইন' : 'Offline')}
           </span>
-        </div>
+          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold sm:hidden">
+            {cloudStatus === 'connected' ? 'লাইভ' : 'অফলাইন'}
+          </span>
+        </button>
 
         {/* PWA Install Button */}
         <PWAInstallButton variant="compact" />

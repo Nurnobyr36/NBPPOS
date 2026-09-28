@@ -18,7 +18,11 @@ import {
   syncSupplierToFirestore,
   syncStockMovementToFirestore,
   syncShopSettingsToFirestore,
+  syncSaleAndStockBatchToFirestore,
+  syncStockAdjustmentBatchToFirestore,
+  syncPurchaseAndStockBatchToFirestore,
 } from './firebase';
+import { broadcastSync } from './realtimeSync';
 
 const STORAGE_KEYS = {
   PRODUCTS: 'ssp_products_v1',
@@ -119,6 +123,7 @@ export function addProduct(product: Omit<Product, 'id' | 'createdAt' | 'updatedA
 
   // Cloud sync
   syncProductToFirestore(newProduct).catch((e) => console.warn('Firestore syncProduct error:', e));
+  broadcastSync('product', 'create', newProduct, newProduct.id);
 
   // Record opening stock movement if any
   if (newProduct.currentStock > 0) {
@@ -149,6 +154,7 @@ export function updateProduct(id: string, updates: Partial<Product>): Product | 
 
   // Cloud sync
   syncProductToFirestore(products[index]).catch((e) => console.warn('Firestore syncProduct error:', e));
+  broadcastSync('product', 'update', products[index], products[index].id);
 
   return products[index];
 }
@@ -161,6 +167,7 @@ export function deleteProduct(id: string): boolean {
 
   // Cloud sync
   deleteProductFromFirestore(id).catch((e) => console.warn('Firestore deleteProduct error:', e));
+  broadcastSync('product', 'delete', { id }, id);
 
   return true;
 }
@@ -176,17 +183,28 @@ export function adjustProductStock(productId: string, qtyChange: number, reason:
   p.updatedAt = new Date().toISOString();
   saveProducts(products);
 
-  // Cloud sync
-  syncProductToFirestore(p).catch((e) => console.warn('Firestore adjustStock sync error:', e));
-
-  addStockMovement({
+  const newMov: StockMovement = {
+    id: 'mov-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
     productId: p.id,
     productName: p.name,
     type: 'adjustment',
     qtyChange,
     resultingStock: newStock,
     reason,
-  });
+    createdAt: new Date().toISOString(),
+  };
+
+  const allMovs = getStockMovements();
+  allMovs.unshift(newMov);
+  safeSet(STORAGE_KEYS.STOCK_MOVEMENTS, allMovs);
+
+  // Atomic batch to Firestore
+  syncStockAdjustmentBatchToFirestore(p, newMov).catch((e) =>
+    console.warn('Firestore adjustStock sync error:', e)
+  );
+
+  // Instant broadcast to all tabs
+  broadcastSync('stock', 'update', { productId: p.id, newStock, product: p });
 
   return true;
 }
@@ -211,30 +229,42 @@ export function createSale(saleData: Omit<Sale, 'id' | 'createdAt'>): Sale {
   sales.unshift(newSale);
   saveSales(sales);
 
-  // Cloud sync
-  syncSaleToFirestore(newSale).catch((e) => console.warn('Firestore createSale sync error:', e));
-
   // Deduct stocks and log movements
   const products = getProducts();
+  const updatedProducts: Product[] = [];
+  const movements: StockMovement[] = [];
+
   newSale.items.forEach((item) => {
     const prod = products.find((p) => p.id === item.productId);
     if (prod) {
       const resulting = Math.max(0, (prod.currentStock || 0) - item.qty);
       prod.currentStock = resulting;
-      syncProductToFirestore(prod).catch((e) => console.warn('Firestore updateStock sync error:', e));
-      addStockMovement({
+      prod.updatedAt = new Date().toISOString();
+      updatedProducts.push({ ...prod });
+
+      const newMov: StockMovement = {
+        id: 'mov-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
         productId: prod.id,
         productName: prod.name,
         type: 'sale',
         qtyChange: -item.qty,
         resultingStock: resulting,
         reason: `ইনভয়েস #${newSale.invoiceNo} বিক্রয়`,
-      });
+        createdAt: new Date().toISOString(),
+      };
+      movements.push(newMov);
     }
   });
   saveProducts(products);
 
+  if (movements.length > 0) {
+    const allMovs = getStockMovements();
+    movements.forEach((m) => allMovs.unshift(m));
+    safeSet(STORAGE_KEYS.STOCK_MOVEMENTS, allMovs);
+  }
+
   // Update customer due and total purchase
+  let updatedCustomer: Customer | undefined;
   if (newSale.customerId) {
     const customers = getCustomers();
     const cust = customers.find((c) => c.id === newSale.customerId);
@@ -242,9 +272,19 @@ export function createSale(saleData: Omit<Sale, 'id' | 'createdAt'>): Sale {
       cust.totalPurchase = (cust.totalPurchase || 0) + newSale.total;
       cust.currentDue = (cust.currentDue || 0) + newSale.dueAmount;
       saveCustomers(customers);
-      syncCustomerToFirestore(cust).catch((e) => console.warn('Firestore customer sync error:', e));
+      updatedCustomer = { ...cust };
     }
   }
+
+  // ATOMIC FIRESTORE CLOUD BATCH WRITE:
+  // Guarantees all connected mobiles receive the sale & stock update in the exact same snapshot
+  syncSaleAndStockBatchToFirestore(newSale, updatedProducts, movements, updatedCustomer).catch((e) =>
+    console.warn('Firestore syncSaleAndStockBatchToFirestore error:', e)
+  );
+
+  // Instant broadcast to all tabs on this device
+  broadcastSync('sale', 'create', newSale, newSale.id);
+  broadcastSync('stock', 'update', { products: updatedProducts });
 
   return newSale;
 }
@@ -300,6 +340,11 @@ export function deleteSale(saleId: string, restoreStock: boolean = true): boolea
     console.warn('Firestore deleteSaleFromFirestore error:', e)
   );
 
+  broadcastSync('sale', 'delete', { id: saleId }, saleId);
+  if (restoreStock) {
+    broadcastSync('stock', 'update', { products: getProducts() });
+  }
+
   return true;
 }
 
@@ -330,6 +375,7 @@ export function updateSale(updatedSale: Sale, adjustStockDiff: boolean = true): 
         if (prod) {
           const resulting = Math.max(0, (prod.currentStock || 0) - diff);
           prod.currentStock = resulting;
+          prod.updatedAt = new Date().toISOString();
           syncProductToFirestore(prod).catch((e) =>
             console.warn('Firestore syncProduct error on updateSale:', e)
           );
@@ -345,6 +391,7 @@ export function updateSale(updatedSale: Sale, adjustStockDiff: boolean = true): 
       }
     });
     saveProducts(products);
+    broadcastSync('stock', 'update', { products });
   }
 
   // 2. Adjust customer balances if customer or amounts changed
@@ -388,6 +435,8 @@ export function updateSale(updatedSale: Sale, adjustStockDiff: boolean = true): 
     console.warn('Firestore updateSale sync error:', e)
   );
 
+  broadcastSync('sale', 'update', updatedSale, updatedSale.id);
+
   return updatedSale;
 }
 
@@ -411,32 +460,43 @@ export function createPurchase(purchaseData: Omit<Purchase, 'id' | 'createdAt'>)
   purchases.unshift(newPurchase);
   savePurchases(purchases);
 
-  // Cloud sync
-  syncPurchaseToFirestore(newPurchase).catch((e) => console.warn('Firestore createPurchase sync error:', e));
-
   // Increase stock
   const products = getProducts();
+  const updatedProducts: Product[] = [];
+  const movements: StockMovement[] = [];
+
   newPurchase.items.forEach((item) => {
     const prod = products.find((p) => p.id === item.productId);
     if (prod) {
       const resulting = (prod.currentStock || 0) + item.qty;
       prod.currentStock = resulting;
+      prod.updatedAt = new Date().toISOString();
       if (item.rate > 0) prod.purchasePrice = item.rate;
-      syncProductToFirestore(prod).catch((e) => console.warn('Firestore updateStock sync error:', e));
+      updatedProducts.push({ ...prod });
 
-      addStockMovement({
+      const newMov: StockMovement = {
+        id: 'mov-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
         productId: prod.id,
         productName: prod.name,
         type: 'purchase',
         qtyChange: item.qty,
         resultingStock: resulting,
         reason: `ক্রয় চালান #${newPurchase.invoiceNo}`,
-      });
+        createdAt: new Date().toISOString(),
+      };
+      movements.push(newMov);
     }
   });
   saveProducts(products);
 
+  if (movements.length > 0) {
+    const allMovs = getStockMovements();
+    movements.forEach((m) => allMovs.unshift(m));
+    safeSet(STORAGE_KEYS.STOCK_MOVEMENTS, allMovs);
+  }
+
   // Update supplier due & purchase
+  let updatedSupplier: Supplier | undefined;
   if (newPurchase.supplierId) {
     const suppliers = getSuppliers();
     const sup = suppliers.find((s) => s.id === newPurchase.supplierId);
@@ -444,9 +504,17 @@ export function createPurchase(purchaseData: Omit<Purchase, 'id' | 'createdAt'>)
       sup.totalPurchase = (sup.totalPurchase || 0) + newPurchase.total;
       sup.currentDue = (sup.currentDue || 0) + newPurchase.dueAmount;
       saveSuppliers(suppliers);
-      syncSupplierToFirestore(sup).catch((e) => console.warn('Firestore supplier sync error:', e));
+      updatedSupplier = { ...sup };
     }
   }
+
+  // Atomic batch to Firestore
+  syncPurchaseAndStockBatchToFirestore(newPurchase, updatedProducts, movements, updatedSupplier).catch((e) =>
+    console.warn('Firestore syncPurchaseAndStockBatchToFirestore error:', e)
+  );
+
+  broadcastSync('purchase', 'create', newPurchase, newPurchase.id);
+  broadcastSync('stock', 'update', { products: updatedProducts });
 
   return newPurchase;
 }

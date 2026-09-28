@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { TabType, Language, Product, Sale, Customer, Supplier, Purchase, ShopSettings } from './types';
 import {
   getProducts,
@@ -34,7 +34,10 @@ import {
   syncShopSettingsToFirestore,
   isLegacyMockId,
   purgeLegacyMockDataFromFirestore,
+  reconnectFirestoreNetwork,
+  fetchLatestCloudData,
 } from './services/firebase';
+import { subscribeToSync } from './services/realtimeSync';
 import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
 import { OfflineIndicator } from './components/OfflineIndicator';
@@ -94,6 +97,15 @@ export function App() {
 
   // Cloud sync status state
   const [cloudStatus, setCloudStatus] = useState<'connected' | 'syncing' | 'offline'>('syncing');
+  const [realtimeNotice, setRealtimeNotice] = useState<{
+    message: string;
+    type: 'sale' | 'stock' | 'sync';
+  } | null>(null);
+
+  // Tracking refs to detect remote changes from other phones/devices
+  const isInitialLoadDoneRef = useRef(false);
+  const knownSaleIdsRef = useRef<Set<string>>(new Set());
+  const knownStockMapRef = useRef<Map<string, number>>(new Map());
 
   // Load all data from storage
   const loadData = useCallback(() => {
@@ -146,6 +158,28 @@ export function App() {
 
         const merged = Array.from(map.values());
         merged.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+
+        // Detect remote stock changes from other mobile phones
+        if (isInitialLoadDoneRef.current) {
+          let stockChanged = false;
+          cleanCloud.forEach((cp) => {
+            const oldStock = knownStockMapRef.current.get(cp.id);
+            if (oldStock !== undefined && oldStock !== cp.currentStock) {
+              stockChanged = true;
+            }
+          });
+          if (stockChanged) {
+            setRealtimeNotice({
+              message: '⚡ অটো-সিঙ্ক: অন্য মোবাইল থেকে পণ্যের স্টক রিয়েল-টাইমে আপডেট হয়েছে!',
+              type: 'stock',
+            });
+            setTimeout(() => setRealtimeNotice((prev) => prev?.type === 'stock' ? null : prev), 3500);
+          }
+        }
+
+        // Update known stocks
+        merged.forEach((p) => knownStockMapRef.current.set(p.id, p.currentStock || 0));
+
         setProducts(merged);
         saveProducts(merged);
         setCloudStatus('connected');
@@ -172,6 +206,23 @@ export function App() {
 
         const merged = Array.from(map.values());
         merged.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+
+        // Detect new remote sales from other phones
+        if (isInitialLoadDoneRef.current) {
+          const newRemoteSales = cleanCloud.filter((s) => !knownSaleIdsRef.current.has(s.id));
+          if (newRemoteSales.length > 0) {
+            const newest = newRemoteSales[0];
+            setRealtimeNotice({
+              message: `⚡ অটো-সিঙ্ক: অন্য মোবাইল থেকে নতুন বিক্রয় সম্পন্ন হয়েছে (#${newest.invoiceNo}) • স্টক ও হিসাব আপডেট হয়েছে!`,
+              type: 'sale',
+            });
+            setTimeout(() => setRealtimeNotice((prev) => prev?.message.includes(newest.invoiceNo) ? null : prev), 4500);
+          }
+        }
+
+        // Update known sales
+        merged.forEach((s) => knownSaleIdsRef.current.add(s.id));
+
         setSales(merged);
         saveSales(merged);
       },
@@ -302,6 +353,72 @@ export function App() {
     };
   }, [loadData]);
 
+  // Mark initial load done after first sync cycle so subsequent updates show notifications
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      isInitialLoadDoneRef.current = true;
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Multi-device & mobile lifecycle listeners:
+  // Wakes up network and fetches fresh data when mobile phone screen is unlocked or app tab focused
+  useEffect(() => {
+    const handleResume = () => {
+      if (document.visibilityState === 'visible') {
+        reconnectFirestoreNetwork().catch(console.warn);
+        fetchLatestCloudData()
+          .then(({ products: cp, sales: cs, stockMovements: cm }) => {
+            if (cp && cp.length > 0) {
+              setProducts(cp);
+              saveProducts(cp);
+            }
+            if (cs && cs.length > 0) {
+              setSales(cs);
+              saveSales(cs);
+            }
+            if (cm && cm.length > 0) {
+              setStockMovements(cm);
+            }
+            setCloudStatus('connected');
+          })
+          .catch(() => {});
+      }
+    };
+
+    const handleOnline = () => {
+      reconnectFirestoreNetwork().catch(console.warn);
+      loadData();
+      setCloudStatus('connected');
+    };
+
+    document.addEventListener('visibilitychange', handleResume);
+    window.addEventListener('focus', handleResume);
+    window.addEventListener('online', handleOnline);
+
+    // Cross-tab broadcast listener on same device
+    const unsubBroadcast = subscribeToSync(() => {
+      loadData();
+    });
+
+    // Periodic heartbeat (every 12s) to keep mobile sockets active & verify connection
+    const heartbeatTimer = setInterval(() => {
+      if (document.visibilityState === 'visible' && navigator.onLine) {
+        testConnection()
+          .then((ok) => setCloudStatus(ok ? 'connected' : 'offline'))
+          .catch(() => setCloudStatus('offline'));
+      }
+    }, 12000);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleResume);
+      window.removeEventListener('focus', handleResume);
+      window.removeEventListener('online', handleOnline);
+      unsubBroadcast();
+      clearInterval(heartbeatTimer);
+    };
+  }, [loadData]);
+
   // Dark mode effect
   useEffect(() => {
     if (darkMode) {
@@ -395,6 +512,7 @@ export function App() {
           products={products}
           sales={sales}
           cloudStatus={cloudStatus}
+          onRefreshData={loadData}
           onOpenAuthModal={() => setIsAuthModalOpen(true)}
           onSelectProduct={(product) => {
             setEditingProduct(product);
@@ -407,6 +525,24 @@ export function App() {
             setSearchQuery('');
           }}
         />
+
+        {/* Real-time Multi-Device Sync Live Notification Toast */}
+        {realtimeNotice && (
+          <div className="fixed top-16 right-3 sm:right-6 z-50 animate-bounce bg-emerald-700 dark:bg-emerald-600 text-white px-4 py-2.5 rounded-2xl shadow-2xl border border-emerald-400/50 flex items-center gap-2.5 text-xs font-bold transition-all max-w-sm">
+            <span className="relative flex h-2.5 w-2.5 shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
+            </span>
+            <span className="flex-1">{realtimeNotice.message}</span>
+            <button
+              type="button"
+              onClick={() => setRealtimeNotice(null)}
+              className="p-1 hover:bg-white/20 rounded-md shrink-0 cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {/* Content Area */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-7">

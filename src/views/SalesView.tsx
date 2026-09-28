@@ -9,12 +9,14 @@ import {
   AlertCircle,
   Calendar,
   Filter,
+  Coins,
 } from 'lucide-react';
 import { Sale, Product, Customer, Language } from '../types';
 import { formatMoney, formatDate, translations } from '../utils/formatters';
 import { updateSale, deleteSale } from '../services/storage';
 import { EditSaleModal } from '../components/EditSaleModal';
 import { DeleteSaleModal } from '../components/DeleteSaleModal';
+import { ProfitReportModal } from '../components/ProfitReportModal';
 
 interface SalesViewProps {
   sales?: Sale[];
@@ -44,6 +46,7 @@ export const SalesView: React.FC<SalesViewProps> = ({
   // Modals state
   const [editingSale, setEditingSale] = useState<Sale | null>(null);
   const [deletingSale, setDeletingSale] = useState<Sale | null>(null);
+  const [isProfitModalOpen, setIsProfitModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -122,13 +125,24 @@ export const SalesView: React.FC<SalesViewProps> = ({
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={onNewSale}
-          className="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer w-fit"
-        >
-          + নতুন বিক্রয় (POS)
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setIsProfitModalOpen(true)}
+            className="px-3.5 py-2.5 bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/80 rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+            title="মাসিক ও পর্যায়ক্রমিক লাভ রিপোর্ট দেখুন"
+          >
+            <Coins className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+            <span>লাভ রিপোর্ট (Profit Analytics)</span>
+          </button>
+          <button
+            type="button"
+            onClick={onNewSale}
+            className="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer w-fit"
+          >
+            + নতুন বিক্রয় (POS)
+          </button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -337,6 +351,18 @@ export const SalesView: React.FC<SalesViewProps> = ({
           onConfirmDelete={handleConfirmDelete}
         />
       )}
+
+      {/* Profit & Sales Analytics Report Modal */}
+      <ProfitReportModal
+        isOpen={isProfitModalOpen}
+        onClose={() => setIsProfitModalOpen(false)}
+        sales={sales}
+        products={products}
+        initialPeriod="thisMonth"
+        currencySymbol={currencySymbol}
+        onViewInvoice={onViewInvoice}
+        onNavigateToPos={onNewSale}
+      />
     </div>
   );
 };
