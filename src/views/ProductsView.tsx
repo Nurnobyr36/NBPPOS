@@ -22,6 +22,7 @@ import { formatMoney, translations } from '../utils/formatters';
 import { deleteProduct, updateProduct } from '../services/storage';
 import { syncProductToFirestore } from '../services/firebase';
 import { useAuth } from '../context/AuthContext';
+import { ProductEditModal } from '../components/ProductEditModal';
 
 interface ProductsViewProps {
   products?: Product[];
@@ -50,6 +51,9 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
   const [stockFilter, setStockFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+
+  // Quick Product Edit Modal state
+  const [editingModalProduct, setEditingModalProduct] = useState<Product | null>(null);
 
   // Quick Buy Price (কেনা দাম) Modal state
   const [editingBuyPriceProduct, setEditingBuyPriceProduct] = useState<Product | null>(null);
@@ -442,7 +446,11 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                   )}
 
                   {/* Name */}
-                  <h4 className="font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100 line-clamp-2 leading-snug min-h-[2.4rem] mb-1">
+                  <h4
+                    onClick={() => setEditingModalProduct(p)}
+                    className="font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100 line-clamp-2 leading-snug min-h-[2.4rem] mb-1 hover:text-emerald-600 dark:hover:text-emerald-400 cursor-pointer transition-colors"
+                    title="পণ্য সম্পাদনা করতে ক্লিক করুন"
+                  >
                     {p.name}
                   </h4>
 
@@ -530,7 +538,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
-                        onClick={() => onEdit(p)}
+                        onClick={() => setEditingModalProduct(p)}
                         className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/40 transition-colors cursor-pointer"
                         title="সম্পাদনা করুন"
                       >
@@ -734,7 +742,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                         )}
                         <button
                           type="button"
-                          onClick={() => onEdit(p)}
+                          onClick={() => setEditingModalProduct(p)}
                           className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
                           title="সম্পাদনা করুন"
                         >
@@ -846,6 +854,24 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Quick Product Edit Modal */}
+      <ProductEditModal
+        isOpen={Boolean(editingModalProduct)}
+        product={editingModalProduct}
+        currencySymbol={currencySymbol}
+        lang={lang}
+        onClose={() => setEditingModalProduct(null)}
+        onSaved={(updated) => {
+          onRefreshData?.();
+          setToastMsg(`"${updated.name}" পণ্যটি সফলভাবে আপডেট ও সংরক্ষিত হয়েছে!`);
+          setTimeout(() => setToastMsg(null), 3500);
+        }}
+        onOpenFullForm={(p) => {
+          setEditingModalProduct(null);
+          onEdit(p);
+        }}
+      />
 
       {/* Notification Toast */}
       {toastMsg && (

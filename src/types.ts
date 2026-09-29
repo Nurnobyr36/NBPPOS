@@ -85,6 +85,7 @@ export interface Sale {
   sellerName?: string;
   sellerEmail?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 // Designated Admin Emails specified by the shop owner

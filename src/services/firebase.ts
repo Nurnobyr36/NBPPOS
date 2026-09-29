@@ -3,8 +3,7 @@ import { getAuth } from 'firebase/auth';
 import {
   initializeFirestore,
   getFirestore,
-  persistentLocalCache,
-  persistentMultipleTabManager,
+  memoryLocalCache,
   doc,
   getDoc,
   collection,
@@ -29,34 +28,21 @@ try {
 // Initialize Firebase
 export const app = initializeApp(firebaseConfig);
 
-// Initialize Firestore with offline persistence and resilient auto-detect transport
+// Initialize Firestore with robust in-memory cache to prevent IndexedDB quota & target assertion errors
 function initFirestoreInstance() {
   const dbId = firebaseConfig.firestoreDatabaseId;
   try {
     return initializeFirestore(
       app,
       {
-        localCache: persistentLocalCache({
-          tabManager: persistentMultipleTabManager(),
-        }),
-        experimentalAutoDetectLongPolling: true,
+        localCache: memoryLocalCache(),
         ignoreUndefinedProperties: true,
       },
       dbId
     );
   } catch (err) {
-    try {
-      return initializeFirestore(
-        app,
-        {
-          experimentalAutoDetectLongPolling: true,
-          ignoreUndefinedProperties: true,
-        },
-        dbId
-      );
-    } catch {
-      return getFirestore(app, dbId);
-    }
+    console.warn('initializeFirestore fallback:', err);
+    return getFirestore(app, dbId);
   }
 }
 

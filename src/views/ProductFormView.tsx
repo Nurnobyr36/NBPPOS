@@ -15,6 +15,7 @@ import {
 import { Product, Supplier, Language } from '../types';
 import { generateSku, generateBarcode, formatMoney, translations } from '../utils/formatters';
 import { addProduct, updateProduct } from '../services/storage';
+import { syncProductToFirestore } from '../services/firebase';
 import { ImageUploadWidget } from '../components/ImageUploadWidget';
 import { useAuth } from '../context/AuthContext';
 
@@ -37,29 +38,51 @@ export const ProductFormView: React.FC<ProductFormViewProps> = ({
 }) => {
   const t = translations[lang];
   const { canViewBuyPrice } = useAuth();
-  const isEditing = Boolean(initialProduct);
+  const isEditing = Boolean(initialProduct && initialProduct.id);
 
   const [name, setName] = useState(initialProduct?.name || '');
   const [sku, setSku] = useState(initialProduct?.sku || '');
   const [barcode, setBarcode] = useState(initialProduct?.barcode || '');
-  const [categoryName, setCategoryName] = useState(initialProduct?.categoryName || '');
+  const [categoryName, setCategoryName] = useState(
+    initialProduct?.categoryName || (initialProduct as any)?.category || ''
+  );
   const [brandName, setBrandName] = useState(initialProduct?.brandName || '');
-  const [unitName, setUnitName] = useState(initialProduct?.unitName || 'pcs');
+  const [unitName, setUnitName] = useState(
+    initialProduct?.unitName || (initialProduct as any)?.unit || 'pcs'
+  );
   const [supplierId, setSupplierId] = useState(initialProduct?.supplierId || '');
   const [imageUrl, setImageUrl] = useState(initialProduct?.imageUrl || '');
 
   // Pricing
-  const [purchasePrice, setPurchasePrice] = useState<number>(initialProduct?.purchasePrice || 0);
-  const [salePrice, setSalePrice] = useState<number>(initialProduct?.salePrice || 0);
-  const [wholesalePrice, setWholesalePrice] = useState<number>(initialProduct?.wholesalePrice || 0);
-  const [specialPrice, setSpecialPrice] = useState<number>(initialProduct?.specialPrice || 0);
-  const [minSalePrice, setMinSalePrice] = useState<number>(initialProduct?.minSalePrice || 0);
-  const [vatRate, setVatRate] = useState<number>(initialProduct?.vatRate || 0);
+  const [purchasePrice, setPurchasePrice] = useState<number | string>(
+    initialProduct?.purchasePrice !== undefined ? initialProduct.purchasePrice : 0
+  );
+  const [salePrice, setSalePrice] = useState<number | string>(
+    initialProduct?.salePrice !== undefined ? initialProduct.salePrice : 0
+  );
+  const [wholesalePrice, setWholesalePrice] = useState<number | string>(
+    initialProduct?.wholesalePrice !== undefined ? initialProduct.wholesalePrice : 0
+  );
+  const [specialPrice, setSpecialPrice] = useState<number | string>(
+    initialProduct?.specialPrice !== undefined ? initialProduct.specialPrice : 0
+  );
+  const [minSalePrice, setMinSalePrice] = useState<number | string>(
+    initialProduct?.minSalePrice !== undefined ? initialProduct.minSalePrice : 0
+  );
+  const [vatRate, setVatRate] = useState<number | string>(
+    initialProduct?.vatRate !== undefined ? initialProduct.vatRate : 0
+  );
 
   // Stock
-  const [currentStock, setCurrentStock] = useState<number>(initialProduct?.currentStock || 0);
-  const [minStock, setMinStock] = useState<number>(initialProduct?.minStock || 5);
-  const [maxStock, setMaxStock] = useState<number>(initialProduct?.maxStock || 100);
+  const [currentStock, setCurrentStock] = useState<number | string>(
+    initialProduct?.currentStock !== undefined ? initialProduct.currentStock : 0
+  );
+  const [minStock, setMinStock] = useState<number | string>(
+    initialProduct?.minStock !== undefined ? initialProduct.minStock : 5
+  );
+  const [maxStock, setMaxStock] = useState<number | string>(
+    initialProduct?.maxStock !== undefined ? initialProduct.maxStock : 100
+  );
   const [status, setStatus] = useState<'active' | 'inactive'>(initialProduct?.status || 'active');
 
   // Others
@@ -68,6 +91,58 @@ export const ProductFormView: React.FC<ProductFormViewProps> = ({
   const [description, setDescription] = useState(initialProduct?.description || '');
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Synchronize form state whenever initialProduct changes
+  useEffect(() => {
+    if (initialProduct && initialProduct.id) {
+      setName(initialProduct.name || '');
+      setSku(initialProduct.sku || '');
+      setBarcode(initialProduct.barcode || '');
+      setCategoryName(initialProduct.categoryName || (initialProduct as any)?.category || '');
+      setBrandName(initialProduct.brandName || '');
+      setUnitName(initialProduct.unitName || (initialProduct as any)?.unit || 'pcs');
+      setSupplierId(initialProduct.supplierId || '');
+      setImageUrl(initialProduct.imageUrl || '');
+      setPurchasePrice(initialProduct.purchasePrice ?? 0);
+      setSalePrice(initialProduct.salePrice ?? 0);
+      setWholesalePrice(initialProduct.wholesalePrice ?? 0);
+      setSpecialPrice(initialProduct.specialPrice ?? 0);
+      setMinSalePrice(initialProduct.minSalePrice ?? 0);
+      setVatRate(initialProduct.vatRate ?? 0);
+      setCurrentStock(initialProduct.currentStock ?? 0);
+      setMinStock(initialProduct.minStock ?? 5);
+      setMaxStock(initialProduct.maxStock ?? 100);
+      setStatus(initialProduct.status || 'active');
+      setWarranty(initialProduct.warranty || '');
+      setExpiryDate(initialProduct.expiryDate || '');
+      setDescription(initialProduct.description || '');
+      setErrorMessage(null);
+    } else {
+      setName('');
+      setSku(generateSku());
+      setBarcode('');
+      setCategoryName('');
+      setBrandName('');
+      setUnitName('pcs');
+      setSupplierId('');
+      setImageUrl('');
+      setPurchasePrice(0);
+      setSalePrice(0);
+      setWholesalePrice(0);
+      setSpecialPrice(0);
+      setMinSalePrice(0);
+      setVatRate(0);
+      setCurrentStock(0);
+      setMinStock(5);
+      setMaxStock(100);
+      setStatus('active');
+      setWarranty('');
+      setExpiryDate('');
+      setDescription('');
+      setErrorMessage(null);
+    }
+  }, [initialProduct]);
 
   useEffect(() => {
     if (!sku && !isEditing) {
@@ -83,7 +158,7 @@ export const ProductFormView: React.FC<ProductFormViewProps> = ({
     setSku(generateSku());
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
@@ -95,49 +170,66 @@ export const ProductFormView: React.FC<ProductFormViewProps> = ({
       setErrorMessage('SKU কোড প্রদান করুন!');
       return;
     }
-    if (salePrice < 0 || purchasePrice < 0) {
+    const numSalePrice = Number(salePrice) || 0;
+    const numPurchasePrice = Number(purchasePrice) || 0;
+
+    if (numSalePrice < 0 || numPurchasePrice < 0) {
       setErrorMessage('মূল্য ঋণাত্মক হতে পারবে না!');
       return;
     }
 
-    const supplier = suppliers.find((s) => s.id === supplierId);
+    setIsSaving(true);
+    try {
+      const supplier = suppliers.find((s) => s.id === supplierId);
 
-    const payload = {
-      name: name.trim(),
-      sku: sku.trim(),
-      barcode: barcode.trim(),
-      categoryName: categoryName.trim() || 'সাধারণ',
-      brandName: brandName.trim(),
-      unitName,
-      supplierId: supplierId || undefined,
-      supplierName: supplier?.name,
-      imageUrl,
-      purchasePrice: Number(purchasePrice) || 0,
-      salePrice: Number(salePrice) || 0,
-      wholesalePrice: Number(wholesalePrice) || 0,
-      specialPrice: Number(specialPrice) || 0,
-      minSalePrice: Number(minSalePrice) || 0,
-      vatRate: Number(vatRate) || 0,
-      currentStock: Number(currentStock) || 0,
-      minStock: Number(minStock) || 5,
-      maxStock: Number(maxStock) || 0,
-      status,
-      warranty: warranty.trim(),
-      expiryDate,
-      description: description.trim(),
-    };
+      const payload = {
+        name: name.trim(),
+        sku: sku.trim(),
+        barcode: barcode.trim(),
+        categoryName: categoryName.trim() || 'সাধারণ',
+        brandName: brandName.trim(),
+        unitName,
+        supplierId: supplierId || undefined,
+        supplierName: supplier?.name,
+        imageUrl,
+        purchasePrice: numPurchasePrice,
+        salePrice: numSalePrice,
+        wholesalePrice: Number(wholesalePrice) || 0,
+        specialPrice: Number(specialPrice) || 0,
+        minSalePrice: Number(minSalePrice) || 0,
+        vatRate: Number(vatRate) || 0,
+        currentStock: Number(currentStock) || 0,
+        minStock: Number(minStock) || 5,
+        maxStock: Number(maxStock) || 0,
+        status,
+        warranty: warranty.trim(),
+        expiryDate,
+        description: description.trim(),
+      };
 
-    let result: Product | null = null;
-    if (isEditing && initialProduct) {
-      result = updateProduct(initialProduct.id, payload);
-    } else {
-      result = addProduct(payload);
-    }
+      let result: Product | null = null;
+      if (isEditing && initialProduct?.id) {
+        result = updateProduct(initialProduct.id, payload);
+      } else {
+        result = addProduct(payload);
+      }
 
-    if (result) {
-      onSaved(result);
-    } else {
-      setErrorMessage('পণ্য সংরক্ষণ করতে সমস্যা হয়েছে। পুনরায় চেষ্টা করুন।');
+      if (result) {
+        // Ensure immediate write to Firestore backend
+        try {
+          await syncProductToFirestore(result);
+        } catch (syncErr) {
+          console.warn('Direct firestore product sync notice:', syncErr);
+        }
+        onSaved(result);
+      } else {
+        setErrorMessage('পণ্য সংরক্ষণ করতে সমস্যা হয়েছে। পুনরায় চেষ্টা করুন।');
+      }
+    } catch (err: any) {
+      console.error('Error saving product:', err);
+      setErrorMessage(err?.message || 'পণ্য সংরক্ষণ করতে সমস্যা হয়েছে।');
+    } finally {
+      setIsSaving(false);
     }
   };
 

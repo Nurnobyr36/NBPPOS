@@ -23,6 +23,7 @@ import { formatDate, formatMoney, translations } from '../utils/formatters';
 import { adjustProductStock, updateProduct } from '../services/storage';
 import { syncProductToFirestore } from '../services/firebase';
 import { useAuth } from '../context/AuthContext';
+import { ProductEditModal } from '../components/ProductEditModal';
 
 interface StockViewProps {
   products?: Product[];
@@ -32,6 +33,7 @@ interface StockViewProps {
   onRefreshData?: () => void;
   activeProductForModal?: Product | null;
   onCloseModal?: () => void;
+  onEditProduct?: (product: Product) => void;
 }
 
 export const StockView: React.FC<StockViewProps> = ({
@@ -42,11 +44,13 @@ export const StockView: React.FC<StockViewProps> = ({
   onRefreshData,
   activeProductForModal,
   onCloseModal,
+  onEditProduct,
 }) => {
   const t = translations[lang];
   const { canViewBuyPrice } = useAuth();
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [editingModalProduct, setEditingModalProduct] = useState<Product | null>(null);
   const [adjustModalProduct, setAdjustModalProduct] = useState<Product | null>(
     activeProductForModal || null
   );
@@ -369,13 +373,24 @@ export const StockView: React.FC<StockViewProps> = ({
                         )}
                       </td>
                       <td className="py-2.5 px-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => handleOpenAdjust(p)}
-                          className="px-3 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-emerald-600 hover:text-white rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
-                        >
-                          স্টক সমন্বয়
-                        </button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setEditingModalProduct(p)}
+                            className="px-2.5 py-1 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                            title="পণ্য ও মূল্য সম্পাদনা করুন"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                            <span>সম্পাদনা</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenAdjust(p)}
+                            className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-emerald-600 hover:text-white rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
+                          >
+                            স্টক সমন্বয়
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -616,6 +631,24 @@ export const StockView: React.FC<StockViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Quick Product Edit Modal */}
+      <ProductEditModal
+        isOpen={Boolean(editingModalProduct)}
+        product={editingModalProduct}
+        currencySymbol={currencySymbol}
+        lang={lang}
+        onClose={() => setEditingModalProduct(null)}
+        onSaved={(updated) => {
+          onRefreshData?.();
+          setToastMsg(`"${updated.name}" সফলভাবে আপডেট হয়েছে!`);
+          setTimeout(() => setToastMsg(null), 3500);
+        }}
+        onOpenFullForm={(p) => {
+          setEditingModalProduct(null);
+          onEditProduct?.(p);
+        }}
+      />
 
       {/* Notification Toast */}
       {toastMsg && (

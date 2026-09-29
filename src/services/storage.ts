@@ -92,11 +92,131 @@ function safeGet<T>(key: string, fallback: T): T {
   }
 }
 
+/**
+ * Strips huge Base64 data URLs (> 50KB) from products/settings to protect localStorage quota.
+ */
+function sanitizeItemForLocalStorage<T>(value: T): T {
+  if (!value) return value;
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeItemForLocalStorage(item)) as unknown as T;
+  }
+  if (typeof value === 'object') {
+    const copy = { ...value } as any;
+    // Check for heavy base64 strings in imageUrl or logoUrl
+    if (
+      typeof copy.imageUrl === 'string' &&
+      copy.imageUrl.startsWith('data:image/') &&
+      copy.imageUrl.length > 50000
+    ) {
+      copy.imageUrl = '';
+    }
+    if (
+      typeof copy.logoUrl === 'string' &&
+      copy.logoUrl.startsWith('data:image/') &&
+      copy.logoUrl.length > 50000
+    ) {
+      copy.logoUrl = '';
+    }
+    return copy;
+  }
+  return value;
+}
+
+/**
+ * Frees up localStorage quota by purging heavy base64 strings or old cache entries.
+ */
+export function freeStorageQuota(): void {
+  try {
+    // 1. Sanitize products if they contain bloated base64 images
+    const rawProds = localStorage.getItem(STORAGE_KEYS.PRODUCTS);
+    if (rawProds && rawProds.length > 600000) {
+      try {
+        const prods = JSON.parse(rawProds);
+        if (Array.isArray(prods)) {
+          const cleaned = prods.map((p) => {
+            if (
+              typeof p.imageUrl === 'string' &&
+              p.imageUrl.startsWith('data:image/') &&
+              p.imageUrl.length > 40000
+            ) {
+              return { ...p, imageUrl: '' };
+            }
+            return p;
+          });
+          localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(cleaned));
+        }
+      } catch (e) {
+        console.warn('Prune bloated products warning:', e);
+      }
+    }
+
+    // 2. Limit stock movements cache in localStorage to latest 150 items (all reside in Firestore)
+    const rawMovs = localStorage.getItem(STORAGE_KEYS.STOCK_MOVEMENTS);
+    if (rawMovs && rawMovs.length > 400000) {
+      try {
+        const movs = JSON.parse(rawMovs);
+        if (Array.isArray(movs) && movs.length > 150) {
+          localStorage.setItem(STORAGE_KEYS.STOCK_MOVEMENTS, JSON.stringify(movs.slice(0, 150)));
+        }
+      } catch (e) {
+        console.warn('Prune movements warning:', e);
+      }
+    }
+
+    // 3. Limit local sales cache to latest 200 items (all reside in Firestore)
+    const rawSales = localStorage.getItem(STORAGE_KEYS.SALES);
+    if (rawSales && rawSales.length > 800000) {
+      try {
+        const sales = JSON.parse(rawSales);
+        if (Array.isArray(sales) && sales.length > 200) {
+          localStorage.setItem(STORAGE_KEYS.SALES, JSON.stringify(sales.slice(0, 200)));
+        }
+      } catch (e) {
+        console.warn('Prune sales warning:', e);
+      }
+    }
+  } catch (e) {
+    console.warn('freeStorageQuota error:', e);
+  }
+}
+
+// Clean bloated quota immediately on initialization
+try {
+  freeStorageQuota();
+} catch {}
+
 function safeSet<T>(key: string, value: T): void {
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch (err) {
-    console.error(`Error saving ${key} to storage:`, err);
+    console.warn(`Initial safeSet quota warning for ${key}, running quota cleanup...`, err);
+
+    // If quota exceeded, clean up and sanitize value
+    try {
+      freeStorageQuota();
+      const sanitized = sanitizeItemForLocalStorage(value);
+      localStorage.setItem(key, JSON.stringify(sanitized));
+    } catch (secondErr) {
+      console.error(`Error saving ${key} to storage after cleanup:`, secondErr);
+
+      // Last resort fallback: strip images and non-critical fields to preserve essential business data
+      if (Array.isArray(value)) {
+        try {
+          const minimal = (value as any[]).slice(0, 100).map((it) => {
+            if (it && typeof it === 'object') {
+              const stripped = { ...it };
+              delete stripped.imageUrl;
+              delete stripped.description;
+              return stripped;
+            }
+            return it;
+          });
+          localStorage.setItem(key, JSON.stringify(minimal));
+        } catch (finalErr) {
+          console.error(`Final minimal save failed for ${key}:`, finalErr);
+        }
+      }
+    }
   }
 }
 
@@ -142,21 +262,87 @@ export function addProduct(product: Omit<Product, 'id' | 'createdAt' | 'updatedA
 
 export function updateProduct(id: string, updates: Partial<Product>): Product | null {
   const products = getProducts();
-  const index = products.findIndex((p) => p.id === id);
-  if (index === -1) return null;
+  let index = products.findIndex((p) => String(p.id) === String(id));
 
-  products[index] = {
-    ...products[index],
-    ...updates,
-    updatedAt: new Date().toISOString(),
-  };
+  // Fallback: match by SKU or barcode if ID reference shifted
+  if (index === -1 && updates.sku) {
+    index = products.findIndex((p) => p.sku === updates.sku);
+  }
+  if (index === -1 && updates.barcode) {
+    index = products.findIndex((p) => p.barcode && p.barcode === updates.barcode);
+  }
+
+  const now = new Date().toISOString();
+  let updatedProduct: Product;
+
+  if (index !== -1) {
+    const existing = products[index];
+    const oldStock = Number(existing.currentStock) || 0;
+    const newStock = updates.currentStock !== undefined ? Number(updates.currentStock) : oldStock;
+
+    updatedProduct = {
+      ...existing,
+      ...updates,
+      id: existing.id || id,
+      updatedAt: now,
+    };
+    products[index] = updatedProduct;
+
+    // Record stock adjustment movement if stock was changed during edit
+    if (updates.currentStock !== undefined && newStock !== oldStock) {
+      const diff = newStock - oldStock;
+      addStockMovement({
+        productId: updatedProduct.id,
+        productName: updatedProduct.name,
+        type: 'adjustment',
+        qtyChange: diff,
+        resultingStock: newStock,
+        reason: 'পণ্য সম্পাদনায় স্টক পরিবর্তন',
+      });
+    }
+  } else {
+    // If not found in localStorage array, construct and add it
+    updatedProduct = {
+      id,
+      name: updates.name || '',
+      sku: updates.sku || '',
+      barcode: updates.barcode || '',
+      categoryName: updates.categoryName || (updates as any).category || 'সাধারণ',
+      brandName: updates.brandName || '',
+      unitName: updates.unitName || (updates as any).unit || 'pcs',
+      supplierId: updates.supplierId,
+      supplierName: updates.supplierName,
+      purchasePrice: Number(updates.purchasePrice) || 0,
+      salePrice: Number(updates.salePrice) || 0,
+      wholesalePrice: Number(updates.wholesalePrice) || 0,
+      specialPrice: Number(updates.specialPrice) || 0,
+      minSalePrice: Number(updates.minSalePrice) || 0,
+      vatRate: Number(updates.vatRate) || 0,
+      currentStock: Number(updates.currentStock) || 0,
+      minStock: Number(updates.minStock) || 5,
+      maxStock: Number(updates.maxStock) || 100,
+      status: updates.status || 'active',
+      warranty: updates.warranty || '',
+      expiryDate: updates.expiryDate || '',
+      description: updates.description || '',
+      imageUrl: updates.imageUrl || '',
+      createdAt: updates.createdAt || now,
+      updatedAt: now,
+      ...updates,
+    };
+    products.unshift(updatedProduct);
+  }
+
   saveProducts(products);
 
-  // Cloud sync
-  syncProductToFirestore(products[index]).catch((e) => console.warn('Firestore syncProduct error:', e));
-  broadcastSync('product', 'update', products[index], products[index].id);
+  // Unmark deleted if it was previously marked deleted
+  unmarkDeletedId('products', updatedProduct.id);
 
-  return products[index];
+  // Cloud sync
+  syncProductToFirestore(updatedProduct).catch((e) => console.warn('Firestore syncProduct error:', e));
+  broadcastSync('product', 'update', updatedProduct, updatedProduct.id);
+
+  return updatedProduct;
 }
 
 export function deleteProduct(id: string): boolean {

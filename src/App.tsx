@@ -131,32 +131,55 @@ export function App() {
         setCloudStatus('offline');
       });
 
-    // Automatically purge any remaining legacy mock items in Firestore collections
-    purgeLegacyMockDataFromFirestore().catch((err) =>
-      console.warn('purgeLegacyMockDataFromFirestore notice:', err)
-    );
-
     // Real-time synchronization listeners with bidirectional persistence
     const unsubProducts = subscribeToProducts(
       (cloudProds) => {
         const cleanCloud = (cloudProds || []).filter((p) => !isLegacyMockId(p.id));
         const localProds = (getProducts() || []).filter((p) => !isLegacyMockId(p.id));
 
-        const map = new Map<string, Product>();
-        // 1. Primary source: confirmed items from cloud Firestore
-        cleanCloud.forEach((p) => map.set(p.id, p));
+        const cloudMap = new Map<string, Product>();
+        cleanCloud.forEach((p) => cloudMap.set(p.id, p));
 
-        // 2. Preserve any user-created local item not yet in cloud, and upload it
-        localProds.forEach((local) => {
-          if (!map.has(local.id) && !isDeletedId('products', local.id)) {
-            map.set(local.id, local);
-            syncProductToFirestore(local).catch((e) =>
-              console.warn('Auto-sync product to Firestore notice:', e)
-            );
+        const localMap = new Map<string, Product>();
+        localProds.forEach((p) => localMap.set(p.id, p));
+
+        const allIds = new Set<string>([...cloudMap.keys(), ...localMap.keys()]);
+        const resultMap = new Map<string, Product>();
+
+        allIds.forEach((id) => {
+          if (isDeletedId('products', id)) {
+            return;
+          }
+          const cloudItem = cloudMap.get(id);
+          const localItem = localMap.get(id);
+
+          if (cloudItem && localItem) {
+            const cloudTime = new Date(cloudItem.updatedAt || cloudItem.createdAt || 0).getTime();
+            const localTime = new Date(localItem.updatedAt || localItem.createdAt || 0).getTime();
+
+            if (localTime > cloudTime) {
+              // Local product was edited more recently! Keep local version and push to cloud
+              resultMap.set(id, localItem);
+              syncProductToFirestore(localItem).catch((e) =>
+                console.warn('Sync newer local product to Firestore:', e)
+              );
+            } else {
+              // Cloud product is newer or equal (e.g. from another mobile phone)
+              resultMap.set(id, cloudItem);
+            }
+          } else if (cloudItem) {
+            resultMap.set(id, cloudItem);
+          } else if (localItem) {
+            resultMap.set(id, localItem);
+            if (isInitialLoadDoneRef.current) {
+              syncProductToFirestore(localItem).catch((e) =>
+                console.warn('Auto-sync product to Firestore notice:', e)
+              );
+            }
           }
         });
 
-        const merged = Array.from(map.values());
+        const merged = Array.from(resultMap.values());
         merged.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
 
         // Detect remote stock changes from other mobile phones
@@ -192,19 +215,41 @@ export function App() {
         const cleanCloud = (cloudSales || []).filter((s) => !isLegacyMockId(s.id));
         const localSales = (getSales() || []).filter((s) => !isLegacyMockId(s.id));
 
-        const map = new Map<string, Sale>();
-        cleanCloud.forEach((s) => map.set(s.id, s));
+        const cloudMap = new Map<string, Sale>();
+        cleanCloud.forEach((s) => cloudMap.set(s.id, s));
 
-        localSales.forEach((local) => {
-          if (!map.has(local.id) && !isDeletedId('sales', local.id)) {
-            map.set(local.id, local);
-            syncSaleToFirestore(local).catch((e) =>
-              console.warn('Auto-sync sale to Firestore notice:', e)
-            );
+        const localMap = new Map<string, Sale>();
+        localSales.forEach((s) => localMap.set(s.id, s));
+
+        const allIds = new Set<string>([...cloudMap.keys(), ...localMap.keys()]);
+        const resultMap = new Map<string, Sale>();
+
+        allIds.forEach((id) => {
+          if (isDeletedId('sales', id)) {
+            return;
+          }
+          const cloudItem = cloudMap.get(id);
+          const localItem = localMap.get(id);
+
+          if (cloudItem && localItem) {
+            const cloudTime = new Date(cloudItem.updatedAt || cloudItem.createdAt || 0).getTime();
+            const localTime = new Date(localItem.updatedAt || localItem.createdAt || 0).getTime();
+
+            if (localTime > cloudTime) {
+              resultMap.set(id, localItem);
+              syncSaleToFirestore(localItem).catch(() => {});
+            } else {
+              resultMap.set(id, cloudItem);
+            }
+          } else if (cloudItem) {
+            resultMap.set(id, cloudItem);
+          } else if (localItem) {
+            resultMap.set(id, localItem);
+            syncSaleToFirestore(localItem).catch(() => {});
           }
         });
 
-        const merged = Array.from(map.values());
+        const merged = Array.from(resultMap.values());
         merged.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
 
         // Detect new remote sales from other phones
@@ -592,8 +637,12 @@ export function App() {
               suppliers={suppliers}
               currencySymbol={currencySymbol}
               lang={lang}
-              onBack={() => setActiveTab('products')}
+              onBack={() => {
+                setEditingProduct(null);
+                setActiveTab('products');
+              }}
               onSaved={() => {
+                setEditingProduct(null);
                 loadData();
                 setActiveTab('products');
               }}
@@ -609,6 +658,7 @@ export function App() {
               onRefreshData={loadData}
               activeProductForModal={adjustModalProduct}
               onCloseModal={() => setAdjustModalProduct(null)}
+              onEditProduct={handleEditProduct}
             />
           )}
 
